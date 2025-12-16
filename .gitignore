@@ -4,7 +4,9 @@ __pycache__/
 *$py.class
 
 # 下载的图片和文档
-
+build/
+downloads/
+dist/
 *.docx
 *.pdf
 
@@ -15,6 +17,7 @@ __pycache__/
 .env
 *.ini
 *.cfg
+*.spec
 
 # 操作系统文件
 .DS_Store

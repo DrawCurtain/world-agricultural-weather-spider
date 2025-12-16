@@ -12,8 +12,11 @@
 - **分类组织**：按国家和地区分类展示预报数据，支持美国和其他国家单独查看
 - **批量图片转换**：支持将HTML文档转换为PNG图片格式
 - **日期目录结构**：按日期组织输出文件，方便查阅和管理
+- **可执行文件**：提供Windows平台的可执行文件，无需安装Python环境即可运行
 
 ## 安装说明
+
+### 方法一：使用Python源代码
 
 1. **克隆仓库**
    ```bash
@@ -22,44 +25,30 @@
    ```
 
 2. **安装依赖**
-   该项目依赖于以下Python库：
-   - requests：用于网络请求
-   - BeautifulSoup4：用于HTML解析
-   - imgkit：用于HTML转图片
-
+   使用requirements.txt安装所有依赖：
    ```bash
-   pip install requests beautifulsoup4 imgkit
+   pip install -r requirements.txt
    ```
 
-3. **安装wkhtmltoimage**
-   imgkit依赖于wkhtmltoimage工具，需要单独安装：
-   - Windows：下载安装包并添加到系统环境变量
+3. **关于wkhtmltoimage**
+   - Windows：项目已内置`bin/wkhtmltoimage.exe`，无需额外安装
    - Linux：`sudo apt-get install wkhtmltopdf`
    - macOS：`brew install wkhtmltopdf`
 
-4. **配置wkhtmltoimage路径**：
-   代码会自动检测以下默认安装路径：
-   - Windows：`C:\Program Files\wkhtmltopdf\bin\wkhtmltoimage.exe`
-   - Windows：`C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltoimage.exe`
-   - Linux/macOS：`/usr/bin/wkhtmltoimage`
-   - macOS (Homebrew)：`/opt/homebrew/bin/wkhtmltoimage`
-   
-   如果你的安装路径不在上述列表中，你可以：
-   - 将wkhtmltoimage添加到系统PATH环境变量中
-   - 或者在运行脚本时使用 `-e` 参数手动指定路径：
-     ```bash
-     python html_to_image.py -e "C:\\Custom\\Path\\to\\wkhtmltoimage.exe" input.html
-     ```
-   - 或者修改 `daily_summary.py` 文件中的 `potential_paths` 列表，添加你的自定义路径
+### 方法二：使用可执行文件（仅Windows）
+
+直接从项目的`dist`目录下载`weather_spider.exe`文件即可使用，无需安装Python环境。
 
 ## 使用方法
 
-### 基本使用
+### 使用Python源代码
 
-直接运行主脚本：
+#### 基本使用
+
+使用模块方式运行主程序：
 
 ```bash
-python daily_summary.py
+python -m weather_spider.daily_summary
 ```
 
 脚本将自动执行以下操作：
@@ -68,52 +57,97 @@ python daily_summary.py
 3. 将HTML文档转换为PNG图片
 4. 将输出文件保存到`output/[日期]/`目录
 
-### 清理环境
+#### 指定日期
+
+可以使用`-d`或`--date`参数指定日期：
+
+```bash
+python -m weather_spider.daily_summary -d 20231216
+```
+
+#### 指定wkhtmltoimage路径
+
+如果内置的wkhtmltoimage无法正常工作，可以使用`-w`或`--wkhtmltoimage`参数指定路径：
+
+```bash
+python -m weather_spider.daily_summary -w "C:\Custom\Path\to\wkhtmltoimage.exe"
+```
+
+#### 清理环境
 
 如果需要清理下载的图片和输出文件，可以运行清理脚本：
 
 ```bash
-python cleanup_files.py
+python -m weather_spider.cleanup_files
+```
+
+### 使用可执行文件
+
+在Windows系统中，直接运行`weather_spider.exe`文件即可：
+
+```bash
+.\weather_spider.exe
+```
+
+支持的命令行参数与Python版本相同：
+
+```bash
+.\weather_spider.exe -d 20231216 -w "C:\Custom\Path\to\wkhtmltoimage.exe"
 ```
 
 ## 项目结构
 
 ```
 spiderMan/
-├── daily_summary.py    # 主程序入口
-├── downloader.py       # 图片下载模块
-├── parser.py           # 数据解析模块
-├── html_to_image.py    # HTML转图片模块
-├── network.py          # 网络请求模块
-├── cleanup_files.py    # 环境清理脚本
+├── README.md           # 项目说明文档
+├── README_EXE.md       # 可执行文件使用说明
+├── requirements.txt    # Python依赖列表
+├── setup.py            # 项目安装配置
 ├── .gitignore          # Git忽略规则
-└── README.md           # 项目说明文档
+├── bin/
+│   └── wkhtmltoimage.exe  # Windows平台HTML转图片工具
+├── dist/
+│   └── weather_spider.exe  # 生成的Windows可执行文件
+└── weather_spider/
+    ├── __init__.py     # 包初始化文件
+    ├── __main__.py     # 包入口点
+    ├── daily_summary.py    # 主程序入口
+    ├── downloader.py       # 图片下载模块
+    ├── parser.py           # 数据解析模块
+    ├── html_to_image.py    # HTML转图片模块
+    ├── network.py          # 网络请求模块
+    └── cleanup_files.py    # 环境清理脚本
 ```
 
 ## 输出文件说明
 
-脚本执行后，输出文件将保存在`output/[日期]/`目录下：
+脚本执行后，输出文件将保存在以下目录：
 
-- `weather_summary_pcp_usa_[日期].html`：美国大豆产区降水预报对比HTML
-- `weather_summary_pcp_others_[日期].html`：其他国家大豆产区降水预报对比HTML
-- `weather_summary_tmp_usa_[日期].html`：美国大豆产区温度预报对比HTML
-- `weather_summary_tmp_others_[日期].html`：其他国家大豆产区温度预报对比HTML
-- 对应的PNG图片文件：由HTML文档转换而来
+- 下载的图片：`downloads/[类型]/[日期]/`
+  - `类型`包括：`pcp`（降水）和`tmp`（温度）
+
+- 生成的文档：`output/[日期]/`
+  - `weather_summary_pcp_usa_[日期].html`：美国大豆产区降水预报对比HTML
+  - `weather_summary_pcp_others_[日期].html`：其他国家大豆产区降水预报对比HTML
+  - `weather_summary_tmp_usa_[日期].html`：美国大豆产区温度预报对比HTML
+  - `weather_summary_tmp_others_[日期].html`：其他国家大豆产区温度预报对比HTML
+  - 对应的PNG图片文件：由HTML文档转换而来
 
 ## 依赖项
 
-- Python 3.6+
-- requests
-- BeautifulSoup4
-- imgkit
-- wkhtmltoimage (外部工具)
+- Python 3.6+（仅源代码版本需要）
+- requests：用于网络请求
+- BeautifulSoup4：用于HTML解析
+- imgkit：用于HTML转图片
+- wkhtmltoimage：用于HTML转图片（内置Windows版本）
 
 ## 注意事项
 
 1. 首次运行时，由于没有前一天的数据，系统会使用当天的数据进行对比
 2. 系统默认使用当前日期作为基准日期
 3. 如果网络连接不稳定，可能会导致图片下载失败
-4. 确保wkhtmltoimage工具已正确安装并添加到系统环境变量
+4. Windows用户优先使用内置的wkhtmltoimage工具，无需额外安装
+5. 使用可执行文件时，所有输出文件将保存在可执行文件所在目录
 
 ## 许可证
 
