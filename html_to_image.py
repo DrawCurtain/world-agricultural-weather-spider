@@ -58,12 +58,12 @@ def html_to_image(html_path, output_path=None, width=1200, height=None, executab
         # 执行转换 - 使用from_file方法，保持相对路径有效性
         imgkit.from_file(html_path, output_path, options=options, config=imgkit_config)
         
-        print(f"✅ 成功将HTML转换为图片: {output_path}")
-        print(f"📏 图片宽度: {width}px，高度: {'自动计算' if height is None else height}px")
+        print(f"[SUCCESS] 成功将HTML转换为图片: {output_path}")
+        print(f"[INFO] 图片宽度: {width}px，高度: {'自动计算' if height is None else height}px")
         return True
         
     except ImportError as e:
-        print(f"❌ 缺少依赖: {e}")
+        print(f"[ERROR] 缺少依赖: {e}")
         print("请安装必要的依赖:")
         print("  pip install imgkit")
         print("  ")
@@ -73,7 +73,7 @@ def html_to_image(html_path, output_path=None, width=1200, height=None, executab
         print("  MacOS: brew install wkhtmltopdf")
         return False
     except Exception as e:
-        print(f"❌ 转换失败: {e}")
+        print(f"[ERROR] 转换失败: {e}")
         return False
 
 
@@ -102,7 +102,7 @@ def batch_convert(folder_path, width=1200, height=800, executable=None):
             if html_to_image(html_path, width=width, height=height, executable=executable):
                 success_count += 1
     
-    print(f"\n📊 批量转换完成: 成功 {success_count} 个文件")
+    print(f"\n[SUMMARY] 批量转换完成: 成功 {success_count} 个文件")
     return success_count
 
 

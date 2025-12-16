@@ -6,6 +6,7 @@
 ## 功能特性
 
 - **自动化数据下载**：自动从世界农业气象网站下载全球主要大豆产区的降水和温度预报图片
+- **智能数据检查**：优先检查本地是否已存在前一天数据，避免重复下载，提高效率
 - **日期对比分析**：支持将当天预报数据与前一天进行对比分析
 - **图片对比展示**：生成左右对比的HTML文档，直观展示预报变化
 - **分类组织**：按国家和地区分类展示预报数据，支持美国和其他国家单独查看
@@ -35,6 +36,21 @@
    - Windows：下载安装包并添加到系统环境变量
    - Linux：`sudo apt-get install wkhtmltopdf`
    - macOS：`brew install wkhtmltopdf`
+
+4. **配置wkhtmltoimage路径**：
+   代码会自动检测以下默认安装路径：
+   - Windows：`C:\Program Files\wkhtmltopdf\bin\wkhtmltoimage.exe`
+   - Windows：`C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltoimage.exe`
+   - Linux/macOS：`/usr/bin/wkhtmltoimage`
+   - macOS (Homebrew)：`/opt/homebrew/bin/wkhtmltoimage`
+   
+   如果你的安装路径不在上述列表中，你可以：
+   - 将wkhtmltoimage添加到系统PATH环境变量中
+   - 或者在运行脚本时使用 `-e` 参数手动指定路径：
+     ```bash
+     python html_to_image.py -e "C:\\Custom\\Path\\to\\wkhtmltoimage.exe" input.html
+     ```
+   - 或者修改 `daily_summary.py` 文件中的 `potential_paths` 列表，添加你的自定义路径
 
 ## 使用方法
 

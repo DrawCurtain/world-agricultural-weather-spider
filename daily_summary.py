@@ -243,12 +243,27 @@ class DailyWeatherSummary:
     
     def run(self):
         """运行完整的汇总流程"""
-        # 下载今天和昨天的数据
+        # 下载今天的数据
         print(f"\n=== 下载今天({self.today_str})的天气数据 ===")
         pcp_results_today, tmp_results_today = self.download_weather_data(self.today_str)
         
-        print(f"\n=== 下载昨天({self.yesterday_str})的天气数据 ===")
-        pcp_results_yesterday, tmp_results_yesterday = self.download_weather_data(self.yesterday_str)
+        # 检查是否已经存在昨天的图片，如果不存在再下载
+        print(f"\n=== 检查昨天({self.yesterday_str})的天气数据 ===")
+        # 检查降水数据是否存在
+        pcp_yesterday_dir = os.path.join("downloads", "pcp", self.yesterday_str)
+        pcp_yesterday_exists = os.path.exists(pcp_yesterday_dir) and len(os.listdir(pcp_yesterday_dir)) > 0
+        
+        # 检查温度数据是否存在
+        tmp_yesterday_dir = os.path.join("downloads", "tmp", self.yesterday_str)
+        tmp_yesterday_exists = os.path.exists(tmp_yesterday_dir) and len(os.listdir(tmp_yesterday_dir)) > 0
+        
+        if pcp_yesterday_exists and tmp_yesterday_exists:
+            print(f"昨天({self.yesterday_str})的天气数据已经存在，跳过下载")
+            pcp_results_yesterday = {}
+            tmp_results_yesterday = {}
+        else:
+            print(f"昨天({self.yesterday_str})的天气数据不存在或不完整，开始下载")
+            pcp_results_yesterday, tmp_results_yesterday = self.download_weather_data(self.yesterday_str)
         
         # 处理降水数据
         print("\n=== 创建降水对比文档 ===")
@@ -262,23 +277,23 @@ class DailyWeatherSummary:
             pcp_usa_doc_path = self.create_comparison_document("pcp", pcp_image_pairs, group_type="usa")
             print(f"美国降水文档路径: {pcp_usa_doc_path}")
             if pcp_usa_doc_path:
-                print(f"✅ 美国降水对比文档已生成: {pcp_usa_doc_path}")
+                print(f"[SUCCESS] 美国降水对比文档已生成: {pcp_usa_doc_path}")
                 # 检查文件是否存在
                 if os.path.exists(pcp_usa_doc_path):
                     print(f"文件大小: {os.path.getsize(pcp_usa_doc_path)} 字节")
                 else:
-                    print(f"❌ 文件不存在: {pcp_usa_doc_path}")
+                    print(f"[ERROR] 文件不存在: {pcp_usa_doc_path}")
                 
             # 创建其他国家降水文档
             pcp_others_doc_path = self.create_comparison_document("pcp", pcp_image_pairs, group_type="others")
             print(f"其他国家降水文档路径: {pcp_others_doc_path}")
             if pcp_others_doc_path:
-                print(f"✅ 其他国家降水对比文档已生成: {pcp_others_doc_path}")
+                print(f"[SUCCESS] 其他国家降水对比文档已生成: {pcp_others_doc_path}")
                 # 检查文件是否存在
                 if os.path.exists(pcp_others_doc_path):
                     print(f"文件大小: {os.path.getsize(pcp_others_doc_path)} 字节")
                 else:
-                    print(f"❌ 文件不存在: {pcp_others_doc_path}")
+                    print(f"[ERROR] 文件不存在: {pcp_others_doc_path}")
         else:
             print("没有找到降水图片对，无法生成对比文档")
         
@@ -291,23 +306,23 @@ class DailyWeatherSummary:
             tmp_usa_doc_path = self.create_comparison_document("tmp", tmp_image_pairs, group_type="usa")
             print(f"美国温度文档路径: {tmp_usa_doc_path}")
             if tmp_usa_doc_path:
-                print(f"✅ 美国温度对比文档已生成: {tmp_usa_doc_path}")
+                print(f"[SUCCESS] 美国温度对比文档已生成: {tmp_usa_doc_path}")
                 # 检查文件是否存在
                 if os.path.exists(tmp_usa_doc_path):
                     print(f"文件大小: {os.path.getsize(tmp_usa_doc_path)} 字节")
                 else:
-                    print(f"❌ 文件不存在: {tmp_usa_doc_path}")
+                    print(f"[ERROR] 文件不存在: {tmp_usa_doc_path}")
                 
             # 创建其他国家温度文档
             tmp_others_doc_path = self.create_comparison_document("tmp", tmp_image_pairs, group_type="others")
             print(f"其他国家温度文档路径: {tmp_others_doc_path}")
             if tmp_others_doc_path:
-                print(f"✅ 其他国家温度对比文档已生成: {tmp_others_doc_path}")
+                print(f"[SUCCESS] 其他国家温度对比文档已生成: {tmp_others_doc_path}")
                 # 检查文件是否存在
                 if os.path.exists(tmp_others_doc_path):
                     print(f"文件大小: {os.path.getsize(tmp_others_doc_path)} 字节")
                 else:
-                    print(f"❌ 文件不存在: {tmp_others_doc_path}")
+                    print(f"[ERROR] 文件不存在: {tmp_others_doc_path}")
         else:
             print("没有找到温度图片对，无法生成对比文档")
         
@@ -323,7 +338,34 @@ class DailyWeatherSummary:
         
         # 使用html_to_image.py脚本转换图片
         import subprocess
-        wkhtmltoimage_path = "D:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltoimage.exe"
+        
+        # 尝试自动检测wkhtmltoimage路径
+        wkhtmltoimage_path = None
+        potential_paths = [
+            # Windows默认安装路径
+            "C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltoimage.exe",
+            "C:\\Program Files (x86)\\wkhtmltopdf\\bin\\wkhtmltoimage.exe",
+            "D:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltoimage.exe",
+            "D:\\Program Files (x86)\\wkhtmltopdf\\bin\\wkhtmltoimage.exe",
+            # Linux/macOS默认安装路径
+            "/usr/bin/wkhtmltoimage",
+            "/usr/local/bin/wkhtmltoimage",
+            # Homebrew安装路径
+            "/opt/homebrew/bin/wkhtmltoimage"
+        ]
+        
+        for path in potential_paths:
+            if os.path.exists(path):
+                wkhtmltoimage_path = path
+                print(f"[INFO] 自动检测到wkhtmltoimage路径: {wkhtmltoimage_path}")
+                break
+        
+        # 如果没有检测到wkhtmltoimage路径，提示用户
+        if wkhtmltoimage_path is None:
+            print("[WARNING] 未自动检测到wkhtmltoimage路径")
+            print("请确保wkhtmltoimage已安装并在系统PATH中，或通过命令行参数指定路径")
+            print("\n转换图片功能将被跳过...")
+            return
         
         for html_file in html_files:
             if os.path.exists(html_file):
@@ -333,14 +375,14 @@ class DailyWeatherSummary:
                     cmd = ["python", "html_to_image.py", "-e", wkhtmltoimage_path, html_file]
                     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                     print(result.stdout.strip())
-                    print(f"✅ 成功将 {html_file} 转换为图片")
+                    print(f"[SUCCESS] 成功将 {html_file} 转换为图片")
                 except subprocess.CalledProcessError as e:
-                    print(f"❌ 转换 {html_file} 失败")
+                    print(f"[ERROR] 转换 {html_file} 失败")
                     print(f"错误信息: {e.stderr.strip()}")
                 except Exception as e:
-                    print(f"❌ 转换 {html_file} 失败: {e}")
+                    print(f"[ERROR] 转换 {html_file} 失败: {e}")
             else:
-                print(f"⚠️  HTML文件不存在: {html_file}")
+                print(f"[WARNING] HTML文件不存在: {html_file}")
         
         print(f"\n=== 汇总完成 ===")
 

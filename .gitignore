@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 # 下载的图片和文档
-downloads/
+
 *.docx
 *.pdf
 
