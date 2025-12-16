@@ -14,13 +14,14 @@ class ImageDownloader:
         if not os.path.exists(directory):
             os.makedirs(directory)
     
-    def download_all_images_by_crop(self, crop_index, vrbl, nday=15):
+    def download_all_images_by_crop(self, crop_index, vrbl, nday=15, date_str=None):
         """下载指定作物的所有国家和地区的图片
         
         Args:
             crop_index: 作物的索引（0-4）
             vrbl: 天气变量（"pcp"表示降水，"tmp"表示温度）
             nday: 天数（15, 60, 180），默认是15
+            date_str: 日期字符串（格式：YYYYMMDD），如果为None则使用当前日期
         
         Returns:
             dict: 下载结果，键为图片保存路径，值为布尔值表示下载是否成功
@@ -36,12 +37,12 @@ class ImageDownloader:
             
             for subregion_index, subregion in enumerate(subregions):
                 # 下载该子地区的图片
-                result = self.download_image(crop_index, region_index, subregion_index, vrbl, nday)
+                result = self.download_image(crop_index, region_index, subregion_index, vrbl, nday, date_str)
                 results.update(result)
         
         return results
     
-    def download_all_images_by_region(self, crop_index, region_index, vrbl, nday=15):
+    def download_all_images_by_region(self, crop_index, region_index, vrbl, nday=15, date_str=None):
         """下载指定作物和地区的所有子地区的图片
         
         Args:
@@ -49,6 +50,7 @@ class ImageDownloader:
             region_index: 地区的索引
             vrbl: 天气变量（"pcp"表示降水，"tmp"表示温度）
             nday: 天数（15, 60, 180），默认是15
+            date_str: 日期字符串（格式：YYYYMMDD），如果为None则使用当前日期
         
         Returns:
             dict: 下载结果，键为图片保存路径，值为布尔值表示下载是否成功
@@ -60,12 +62,12 @@ class ImageDownloader:
         
         for subregion_index, subregion in enumerate(subregions):
             # 下载该子地区的图片
-            result = self.download_image(crop_index, region_index, subregion_index, vrbl, nday)
+            result = self.download_image(crop_index, region_index, subregion_index, vrbl, nday, date_str)
             results.update(result)
         
         return results
     
-    def download_image(self, crop_index, region_index, subregion_index, vrbl, nday=15):
+    def download_image(self, crop_index, region_index, subregion_index, vrbl, nday=15, date_str=None):
         """下载指定作物、地区和子地区的图片
         
         Args:
@@ -74,6 +76,7 @@ class ImageDownloader:
             subregion_index: 子地区的索引
             vrbl: 天气变量（"pcp"表示降水，"tmp"表示温度）
             nday: 天数（15, 60, 180），默认是15
+            date_str: 日期字符串（格式：YYYYMMDD），如果为None则使用当前日期
         
         Returns:
             dict: 下载结果，键为图片保存路径，值为布尔值表示下载是否成功
@@ -121,7 +124,8 @@ class ImageDownloader:
                 region_index=region_index,
                 subregion_index=subregion_index,
                 vrbl=vrbl,
-                nday=nday
+                nday=nday,
+                date_str=date_str
             )
             
             if not save_path:

@@ -24,3 +24,6 @@ Thumbs.db
 ~$*.docx
 *.tmp
 *.temp
+
+# 输出文件夹
+output/

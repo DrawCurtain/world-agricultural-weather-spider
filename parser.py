@@ -5,6 +5,69 @@ class WeatherParser:
         # 从网站中提取的作物、国家和地区列表
         self.crops1 = ["corn", "soybeans", "wheat", "rapeseed", "barley"]
         
+        # 中英文地区名称映射字典
+        self.region_name_map = {
+            "usa": "美国",
+            "brazil": "巴西",
+            "argentina": "阿根廷",
+            "china": "中国",
+            "canada": "加拿大",
+            "europe": "欧洲",
+            "ukraine": "乌克兰",
+            "australia": "澳大利亚",
+            "india": "印度",
+            "iowa": "艾奥瓦州",
+            "illinois": "伊利诺伊州",
+            "nebraska": "内布拉斯加州",
+            "minnesota": "明尼苏达州",
+            "indiana": "印第安纳州",
+            "parana": "巴拉那州",
+            "matogrosso": "马托格罗索州",
+            "minasgerais": "米纳斯吉拉斯州",
+            "goias": "戈亚斯州",
+            "riograndedosul": "南里奥格兰德州",
+            "buenosaires": "布宜诺斯艾利斯省",
+            "cordoba": "科尔多瓦省",
+            "santafe": "圣菲省",
+            "entrerios": "恩特雷里奥斯省",
+            "santiagodelestero": "圣地亚哥-德尔埃斯特罗省",
+            "shandong": "山东省",
+            "heilongjiang": "黑龙江省",
+            "jilin": "吉林省",
+            "henan": "河南省",
+            "hebei": "河北省",
+            "matogrossodosul": "南马托格罗索州",
+            "idaho": "爱达荷州",
+            "kansas": "堪萨斯州",
+            "montana": "蒙大拿州",
+            "northdakota": "北达科他州",
+            "oklahoma": "俄克拉荷马州",
+            "southdakota": "南达科他州",
+            "texas": "得克萨斯州",
+            "washington": "华盛顿州",
+            "alberta": "艾伯塔省",
+            "saskatchewan": "萨斯喀彻温省",
+            "manitoba": "曼尼托巴省",
+            "france": "法国",
+            "germany": "德国",
+            "uk": "英国",
+            "poland": "波兰",
+            "spain": "西班牙",
+            "czech": "捷克",
+            "denmark": "丹麦",
+            "central": "中部地区",
+            "southern": "南部地区",
+            "volga": "伏尔加地区",
+            "urals": "乌拉尔地区",
+            "siberia": "西伯利亚地区",
+            "kazakhstan": "哈萨克斯坦",
+            "anhui": "安徽省",
+            "jiangsu": "江苏省",
+            "westernaustralia": "西澳大利亚州",
+            "victoria": "维多利亚州",
+            "newsouthwales": "新南威尔士州"
+        }
+        
         # 地区列表（英文名称，用于构建URL）
         self.regions1 = [
             ["usa", "brazil", "argentina", "china"],  # corn
@@ -83,6 +146,17 @@ class WeatherParser:
             if 0 <= region_index < len(self.subregions1[crop_index]):
                 return self.subregions1[crop_index][region_index]
         return []
+        
+    def get_chinese_region_name(self, english_name):
+        """获取英文地区名称对应的中文名称
+        
+        Args:
+            english_name: 英文地区名称
+        
+        Returns:
+            str: 中文地区名称，如果没有找到映射则返回英文名称
+        """
+        return self.region_name_map.get(english_name, english_name)
     
     def build_image_url(self, crop_index, region_index, subregion_index, vrbl, nday, fcstimgnum, base_url='http://www.worldagweather.com'):
         """构建图片URL
@@ -137,7 +211,7 @@ class WeatherParser:
         full_url = f"{base_url}/{image_path}"
         return full_url
     
-    def generate_save_path(self, crop_index, region_index, subregion_index, vrbl, nday, save_root='downloads'):
+    def generate_save_path(self, crop_index, region_index, subregion_index, vrbl, nday, save_root='downloads', date_str=None):
         """生成图片保存路径
         
         Args:
@@ -147,6 +221,7 @@ class WeatherParser:
             vrbl: 天气变量（"pcp"表示降水，"tmp"表示温度）
             nday: 天数（15, 60, 180）
             save_root: 保存根目录
+            date_str: 日期字符串（格式：YYYYMMDD），如果为None则使用当前日期
         
         Returns:
             str: 图片保存路径
@@ -180,7 +255,8 @@ class WeatherParser:
         
         # 生成日期目录名
         from datetime import datetime
-        today = datetime.now().strftime("%Y%m%d")
+        if not date_str:
+            date_str = datetime.now().strftime("%Y%m%d")
         
         # 生成文件名（不带日期）
         if nday == 15:
@@ -189,7 +265,7 @@ class WeatherParser:
             filename = f"{vrbl}_{cropname}_{regionname}_{subregionname}_{nday}day.png"
         
         # 构建完整保存路径：downloads/[vrbl]/[date]/[filename]
-        save_path = f"{save_root}/{weather_dir}/{today}/{filename}"
+        save_path = f"{save_root}/{weather_dir}/{date_str}/{filename}"
         return save_path
 
 # 测试代码
