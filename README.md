@@ -37,7 +37,7 @@
 
 ### 方法二：使用可执行文件（仅Windows）
 
-直接从项目的`dist`目录下载`weather_spider.exe`文件即可使用，无需安装Python环境。
+直接从项目的`dist`目录下载`daily_summary.exe`文件即可使用，无需安装Python环境。
 
 ## 使用方法
 

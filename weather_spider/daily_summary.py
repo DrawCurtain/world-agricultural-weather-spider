@@ -1,4 +1,5 @@
 import os
+import sys
 import datetime
 from .downloader import ImageDownloader
 from .parser import WeatherParser
@@ -37,7 +38,7 @@ class DailyWeatherSummary:
                 'previous': (now - datetime.timedelta(days=1)).strftime('%Y%m%d'),
                 'current': self.save_date.strftime('%Y%m%d')
             }
-        
+            
         self.save_date_str = self.save_date.strftime('%Y%m%d')
         self.output_dir = os.path.join('output', self.save_date_str)
         
@@ -90,7 +91,7 @@ class DailyWeatherSummary:
         """查找需要对比的图片对"""
         pairs = []
         
-        # 构建两天的图片路径
+        # 构建两天的图片路径（使用项目相对路径）
         previous_path = os.path.join("downloads", weather_type, self.compare_dates['previous'])
         current_path = os.path.join("downloads", weather_type, self.compare_dates['current'])
         
@@ -350,11 +351,28 @@ class DailyWeatherSummary:
         
         # 检查是否存在wkhtmltoimage
         try:
-            # 尝试使用相对路径
-            bin_path = os.path.join(os.path.dirname(__file__), "..", "bin", "wkhtmltoimage.exe")
+            # 尝试使用不同路径查找wkhtmltoimage
+            bin_path = None
+            
+            # 1. 检查PyInstaller打包后的临时目录
+            if hasattr(sys, '_MEIPASS'):
+                # PyInstaller打包环境
+                bin_path = os.path.join(sys._MEIPASS, "bin", "wkhtmltoimage.exe")
+                log(f"尝试使用PyInstaller临时目录: {bin_path}")
+            
+            # 2. 检查当前工作目录
+            if not bin_path or not os.path.exists(bin_path):
+                bin_path = os.path.join(os.getcwd(), "bin", "wkhtmltoimage.exe")
+                log(f"尝试使用当前工作目录: {bin_path}")
+            
+            # 3. 检查相对路径
+            if not os.path.exists(bin_path):
+                bin_path = os.path.join("bin", "wkhtmltoimage.exe")
+                log(f"尝试使用相对路径: {bin_path}")
+            
             if os.path.exists(bin_path):
                 config = imgkit.config(wkhtmltoimage=bin_path)
-                log(f"使用本地wkhtmltoimage: {bin_path}")
+                log(f"使用wkhtmltoimage: {bin_path}")
             else:
                 log(f"警告: 无法找到wkhtmltoimage: {bin_path} 不存在")
                 return None

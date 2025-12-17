@@ -2,8 +2,6 @@ import os
 import shutil
 import glob
 
-# 获取项目根目录（cleanup_files.py所在目录的父目录）
-project_root = os.path.dirname(os.path.abspath(__file__))
 
 # 定义根目录中需要保留的文件列表
 root_files_to_keep = [
@@ -30,35 +28,36 @@ def cleanup():
     print("=== 开始清理非代码文件 ===")
     
     # 删除根目录下的HTML文件
-    html_files = glob.glob(os.path.join(project_root, "weather_summary_*.html"))
+    html_files = glob.glob("weather_summary_*.html")
     for file in html_files:
         if os.path.exists(file):
             os.remove(file)
             print(f"删除 {file}")
     
     # 删除根目录下的日志文件
-    log_file = os.path.join(project_root, "debug.log")
+    log_file = "debug.log"
     if os.path.exists(log_file):
         os.remove(log_file)
         print("删除 debug.log")
     
     # 删除根目录下的测试文件
     for file in ["check_images.py", "test_with_mock_data.py"]:
-        file_path = os.path.join(project_root, file)
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        if os.path.exists(file):
+            os.remove(file)
             print(f"删除 {file}")
     
     # 删除根目录下的downloads目录
-    downloads_dir = os.path.join(project_root, "downloads")
+    downloads_dir = "downloads"
     if os.path.exists(downloads_dir):
         shutil.rmtree(downloads_dir)
         print("删除 downloads 目录")
     
     # 删除根目录下的其他非代码文件
-    root_files = os.listdir(project_root)
+    # 获取项目根目录（weather_spider的父目录）
+    root_dir = os.path.join(os.path.dirname(__file__), "..")
+    root_files = os.listdir(root_dir)
     for file in root_files:
-        file_path = os.path.join(project_root, file)
+        file_path = os.path.join(root_dir, file)
         if (file not in root_files_to_keep and 
             not file.startswith(".") and 
             not file == "bin" and
@@ -69,7 +68,7 @@ def cleanup():
                 print(f"删除 {file}")
     
     # 删除weather_spider目录下的__pycache__目录
-    pycache_dir = os.path.join(project_root, "weather_spider", "__pycache__")
+    pycache_dir = os.path.join(os.path.dirname(__file__), "__pycache__")
     if os.path.exists(pycache_dir):
         shutil.rmtree(pycache_dir)
         print("删除 weather_spider/__pycache__ 目录")
