@@ -18,127 +18,148 @@ class DailyWeatherSummary:
     def __init__(self):
         self.downloader = ImageDownloader()
         self.parser = WeatherParser()
-        self.today = datetime.datetime.now()
-        self.yesterday = self.today - datetime.timedelta(days=1)
-        self.today_str = self.today.strftime("%Y%m%d")
-        self.yesterday_str = self.yesterday.strftime("%Y%m%d")
         
-        # 创建输出目录结构
-        self.output_root = "output"
-        self.today_output_dir = os.path.join(self.output_root, self.today_str)
-        self.yesterday_output_dir = os.path.join(self.output_root, self.yesterday_str)
+        # 获取当前时间
+        now = datetime.datetime.now()
+        cutoff_time = now.replace(hour=19, minute=30, second=0, microsecond=0)
         
-        # 创建目录
-        os.makedirs(self.today_output_dir, exist_ok=True)
-        print(f"创建输出目录: {self.today_output_dir}")
+        if now < cutoff_time:
+            # 七点半前，下载昨天的数据，保存到昨天的文件夹
+            self.save_date = now - datetime.timedelta(days=1)
+            self.compare_dates = {
+                'previous': (now - datetime.timedelta(days=2)).strftime('%Y%m%d'),
+                'current': self.save_date.strftime('%Y%m%d')
+            }
+        else:
+            # 七点半后，下载今天的数据，保存到今天的文件夹
+            self.save_date = now
+            self.compare_dates = {
+                'previous': (now - datetime.timedelta(days=1)).strftime('%Y%m%d'),
+                'current': self.save_date.strftime('%Y%m%d')
+            }
+        
+        self.save_date_str = self.save_date.strftime('%Y%m%d')
+        self.output_dir = os.path.join('output', self.save_date_str)
+        
+        # 创建输出目录
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+            log(f"创建输出目录: {self.output_dir}")
     
     def download_weather_data(self, date_str):
         """下载指定日期的天气数据
         
         Args:
-            date_str: 日期字符串（格式：YYYYMMDD）
-            
-        Returns:
-            tuple: (pcp_results, tmp_results)
+            date_str: 日期字符串，格式为"YYYYMMDD"
         """
-        print(f"=== 开始下载{date_str}的天气数据 ===")
+        log(f"=== 开始下载{date_str}的天气数据 ===")
         
-        # 下载大豆的降水预报
-        print("\n下载大豆降水预报数据...")
-        pcp_results = self.downloader.download_all_images_by_crop(
-            crop_index=1,  # soybeans
-            vrbl="pcp",
-            nday=15,
-            date_str=date_str
-        )
+        # 下载大豆降水预报数据
+        log(f"\n下载大豆降水预报数据...")
+        self.downloader.download_weather_images(date_str, "pcp", "soybeans")
         
-        # 下载大豆的温度预报
-        print("\n下载大豆温度预报数据...")
-        tmp_results = self.downloader.download_all_images_by_crop(
-            crop_index=1,  # soybeans
-            vrbl="tmp",
-            nday=15,
-            date_str=date_str
-        )
+        # 下载大豆温度预报数据
+        log(f"\n下载大豆温度预报数据...")
+        self.downloader.download_weather_images(date_str, "tmp", "soybeans")
+
+    def process_weather_data(self, weather_type):
+        """处理指定类型的天气数据"""
+        # 查找需要对比的图片对
+        image_pairs = self.find_image_pairs(weather_type)
         
-        # 统计结果
-        pcp_success = sum(1 for success in pcp_results.values() if success)
-        tmp_success = sum(1 for success in tmp_results.values() if success)
+        if not image_pairs:
+            log(f"未找到{weather_type}数据的对比图片")
+            return
         
-        print(f"\n=== 下载完成 ===")
-        print(f"降水数据: 成功 {pcp_success}/{len(pcp_results)}")
-        print(f"温度数据: 成功 {tmp_success}/{len(tmp_results)}")
+        # 为美国创建对比文档
+        self.create_comparison_document(weather_type, image_pairs, "usa")
         
-        return pcp_results, tmp_results
-    
-    def find_image_pairs(self, vrbl):
-        """查找今天和前一天的图片对
+        # 为巴西创建对比文档
+        self.create_comparison_document(weather_type, image_pairs, "brazil")
         
-        Args:
-            vrbl: 天气变量（"pcp"表示降水，"tmp"表示温度）
-            
-        Returns:
-            list: 包含今天和前一天图片路径的元组列表
-        """
-        image_pairs = []
+        # 为阿根廷创建对比文档
+        self.create_comparison_document(weather_type, image_pairs, "argentina")
         
-        # 获取大豆的所有地区和子地区
-        crop_index = 1  # soybeans
-        regions = self.parser.get_regions_by_crop(crop_index)
+        # 为其他国家创建对比文档
+        self.create_comparison_document(weather_type, image_pairs, "others")
         
-        for region_index, region in enumerate(regions):
-            subregions = self.parser.get_subregions_by_crop_and_region(crop_index, region_index)
-            
-            # 处理所有子地区，包括第一个地区标识
-            for subregion_index, subregion in enumerate(subregions):
-                # 生成今天和前一天的图片路径（使用与generate_save_path相同的格式）
-                today_path = f"downloads/{vrbl}/{self.today_str}/{vrbl}_soybeans_{region}_{subregion}_forecast.png"
-                yesterday_path = f"downloads/{vrbl}/{self.yesterday_str}/{vrbl}_soybeans_{region}_{subregion}_forecast.png"
-                
-                # 检查今天的图片是否存在
-                if os.path.exists(today_path):
-                    # 如果昨天的图片不存在，使用今天的图片替代
-                    if not os.path.exists(yesterday_path):
-                        yesterday_path = today_path
-                        print(f"警告：{vrbl}_soybeans_{region}_{subregion}_forecast.png 的昨天图片不存在，使用今天图片替代")
-                    
-                    image_pairs.append((today_path, yesterday_path, region, subregion))
+        # 为所有国家创建对比文档
+        self.create_comparison_document(weather_type, image_pairs, "all")
+
+    def find_image_pairs(self, weather_type):
+        """查找需要对比的图片对"""
+        pairs = []
         
-        print(f"找到 {len(image_pairs)} 个{vrbl}图片对")
-        return image_pairs
-    
-    def add_image_with_caption(self, md_content, image_path, caption):
-        """添加图片到Markdown内容并添加标题"""
-        # 添加图片（使用相对路径，假设Markdown文件和downloads目录在同一层级）
-        md_content.append(f"![{caption}]({image_path})")
-        md_content.append(f"**{caption}**")
-        md_content.append("")  # 空行
+        # 构建两天的图片路径
+        previous_path = os.path.join("downloads", weather_type, self.compare_dates['previous'])
+        current_path = os.path.join("downloads", weather_type, self.compare_dates['current'])
         
+        # 检查路径是否存在
+        if not os.path.exists(previous_path):
+            log(f"前一天图片路径不存在: {previous_path}")
+            previous_path = current_path  # 如果前一天路径不存在，使用当前日期路径
+        
+        if not os.path.exists(current_path):
+            log(f"当前图片路径不存在: {current_path}")
+            return pairs
+        
+        # 获取两天的图片文件列表
+        previous_files = os.listdir(previous_path)
+        current_files = os.listdir(current_path)
+        
+        # 查找匹配的图片对
+        for prev_file in previous_files:
+            if prev_file in current_files:
+                pair = {
+                    "previous": os.path.join(previous_path, prev_file),
+                    "current": os.path.join(current_path, prev_file),
+                    "filename": prev_file
+                }
+                pairs.append(pair)
+        
+        return pairs
+
     def create_comparison_document(self, vrbl, image_pairs, group_type="all"):
         """创建对比HTML文档（左右结构）
         
         Args:
             vrbl: 天气变量（"pcp"表示降水，"tmp"表示温度）
             image_pairs: 图片对列表
-            group_type: 分组类型（"usa"表示美国，"others"表示其他国家，"all"表示全部）
+            group_type: 分组类型（"usa"表示美国，"brazil"表示巴西，"argentina"表示阿根廷，"others"表示其他国家，"all"表示全部）
             
         Returns:
             str: 生成的HTML文档路径
         """
-        log(f"\n=== 创建对比文档 ===")
+        log("\n=== 创建对比文档 ===")
         log(f"天气变量: {vrbl}")
         log(f"分组类型: {group_type}")
         log(f"总图片对数量: {len(image_pairs)}")
         
         # 筛选图片对
         filtered_pairs = []
-        for today_path, yesterday_path, region, subregion in image_pairs:
-            if group_type == "usa" and region == "usa":
-                filtered_pairs.append((today_path, yesterday_path, region, subregion))
-            elif group_type == "others" and region != "usa":
-                filtered_pairs.append((today_path, yesterday_path, region, subregion))
-            elif group_type == "all":
-                filtered_pairs.append((today_path, yesterday_path, region, subregion))
+        for pair in image_pairs:
+            today_path = pair["current"]
+            yesterday_path = pair["previous"]
+            filename = pair["filename"]
+            
+            # 从文件名中提取region和subregion信息
+            # 格式: vrbl_soybeans_region_subregion_forecast.png
+            parts = filename.split("_")
+            if len(parts) >= 5:
+                region = parts[2]
+                subregion = parts[3]
+                
+                # 根据group_type筛选
+                if group_type == "usa" and region == "usa":
+                    filtered_pairs.append((today_path, yesterday_path, region, subregion))
+                elif group_type == "brazil" and region == "brazil":
+                    filtered_pairs.append((today_path, yesterday_path, region, subregion))
+                elif group_type == "argentina" and region == "argentina":
+                    filtered_pairs.append((today_path, yesterday_path, region, subregion))
+                elif group_type == "others" and region not in ["usa", "brazil", "argentina"]:
+                    filtered_pairs.append((today_path, yesterday_path, region, subregion))
+                elif group_type == "all":
+                    filtered_pairs.append((today_path, yesterday_path, region, subregion))
         
         log(f"筛选后图片对数量: {len(filtered_pairs)}")
         
@@ -147,274 +168,271 @@ class DailyWeatherSummary:
             return None
         
         # 生成HTML文件路径
-        print(f"DEBUG: group_type = {group_type}")
         if group_type == "usa":
-            html_path = os.path.join(self.today_output_dir, f"weather_summary_{vrbl}_{group_type}_{self.today_str}.html")
+            html_path = os.path.join(self.output_dir, f"weather_summary_{vrbl}_{group_type}_{self.save_date_str}.html")
             group_desc = "美国"
+        elif group_type == "brazil":
+            html_path = os.path.join(self.output_dir, f"weather_summary_{vrbl}_{group_type}_{self.save_date_str}.html")
+            group_desc = "巴西"
+        elif group_type == "argentina":
+            html_path = os.path.join(self.output_dir, f"weather_summary_{vrbl}_{group_type}_{self.save_date_str}.html")
+            group_desc = "阿根廷"
         elif group_type == "others":
-            html_path = os.path.join(self.today_output_dir, f"weather_summary_{vrbl}_{group_type}_{self.today_str}.html")
+            html_path = os.path.join(self.output_dir, f"weather_summary_{vrbl}_{group_type}_{self.save_date_str}.html")
             group_desc = "其他国家"
         else:
-            html_path = os.path.join(self.today_output_dir, f"weather_summary_{vrbl}_{self.today_str}.html")
+            html_path = os.path.join(self.output_dir, f"weather_summary_{vrbl}_{self.save_date_str}.html")
             group_desc = "所有国家"
-        print(f"DEBUG: html_path = {html_path}")
         
-        # 设置文档标题（中文）
-        title = "大豆作物15天天气预报对比"
+        # 设置天气变量文本描述
         if vrbl == "pcp":
-            title += " - 降水"
+            vrbl_text = "降水预报"
         else:
-            title += " - 温度"
+            vrbl_text = "温度预报"
         
-        title += f" ({group_desc})"
+        # 生成图片HTML部分
+        images_html = ""
+        for i, (today_path, yesterday_path, region, subregion) in enumerate(filtered_pairs):
+            # 生成在HTML中使用的相对路径
+            today_img_path = os.path.relpath(today_path, os.path.dirname(html_path))
+            yesterday_img_path = os.path.relpath(yesterday_path, os.path.dirname(html_path))
+            
+            # 添加到图片列表
+            if vrbl == "pcp":
+                images_html += f"<div class='image-container'>\n"
+                images_html += f"    <h3>{self.parser.get_chinese_region_name(region)} - {self.parser.get_chinese_region_name(subregion)} 降水预报</h3>\n"
+                images_html += f"    <div class='image-pair'>\n"
+                images_html += f"        <div class='image-column'>\n"
+                images_html += f"            <h4>前一天</h4>\n"
+                images_html += f"            <img src='{yesterday_img_path}' alt='Yesterday {region} {subregion} PCP Forecast'>\n"
+                images_html += f"        </div>\n"
+                images_html += f"        <div class='image-column'>\n"
+                images_html += f"            <h4>今天</h4>\n"
+                images_html += f"            <img src='{today_img_path}' alt='Today {region} {subregion} PCP Forecast'>\n"
+                images_html += f"        </div>\n"
+                images_html += f"    </div>\n"
+                images_html += f"</div>\n"  
+            else:  # tmp
+                images_html += f"<div class='image-container'>\n"
+                images_html += f"    <h3>{self.parser.get_chinese_region_name(region)} - {self.parser.get_chinese_region_name(subregion)} 温度预报</h3>\n"
+                images_html += f"    <div class='image-pair'>\n"
+                images_html += f"        <div class='image-column'>\n"
+                images_html += f"            <h4>前一天</h4>\n"
+                images_html += f"            <img src='{yesterday_img_path}' alt='Yesterday {region} {subregion} TMP Forecast'>\n"
+                images_html += f"        </div>\n"
+                images_html += f"        <div class='image-column'>\n"
+                images_html += f"            <h4>今天</h4>\n"
+                images_html += f"            <img src='{today_img_path}' alt='Today {region} {subregion} TMP Forecast'>\n"
+                images_html += f"        </div>\n"
+                images_html += f"    </div>\n"
+                images_html += f"</div>\n"
         
-        # 构建完整的HTML内容字符串
-        html_content = []
-        html_content.append("<!DOCTYPE html>")
-        html_content.append("<html>")
-        html_content.append("<head>")
-        html_content.append("<meta charset='utf-8'>")
-        html_content.append(f"<title>{title}</title>")
-        html_content.append("<style>")
-        html_content.append("body { font-family: Arial, sans-serif; margin: 20px; }")
-        html_content.append("h1 { text-align: center; color: #333; }")
-        html_content.append("h2 { text-align: center; color: #666; }")
-        html_content.append("h3 { color: #444; border-bottom: 1px solid #ddd; padding-bottom: 5px; }")
-        html_content.append("table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }")
-        html_content.append("td { width: 50%; padding: 10px; text-align: center; vertical-align: top; }")
-        html_content.append("img { max-width: 100%; height: auto; }")
-        html_content.append(".divider { border-top: 1px solid #ddd; margin: 20px 0; }")
-        html_content.append("</style>")
-        html_content.append("</head>")
-        html_content.append("<body>")
-        html_content.append(f"<h1>{title}</h1>")
-        html_content.append(f"<h2>{self.yesterday_str} vs {self.today_str}</h2>")
+        # 生成完整的HTML文档
+        html_content = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Forecast Comparison</title>
+    <style>
+        body {{ 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f0f0f0; 
+            width: 2000px; /* 固定宽度以确保左右布局有足够空间 */
+        }}
+        .container {{ 
+            width: 1960px; /* 容器宽度略小于body，提供内边距空间 */
+            margin: 0 auto; 
+            background-color: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); 
+        }}
+        h1 {{ 
+            text-align: center; 
+            color: #333; 
+        }}
+        h2 {{ 
+            color: #555; 
+            border-bottom: 2px solid #ddd; 
+            padding-bottom: 10px; 
+        }}
+        h3 {{ 
+            color: #666; 
+            margin-top: 30px; 
+        }}
+        h4 {{ 
+            color: #777; 
+            margin-bottom: 10px; 
+        }}
+        .image-container {{ 
+            margin-bottom: 40px; 
+            border: 1px solid #eee; 
+            padding: 15px; 
+            border-radius: 8px; 
+        }}
+        .image-pair {{ 
+            display: flex; 
+            justify-content: space-around; 
+            flex-wrap: nowrap; /* 防止折行 */
+            white-space: nowrap; /* 确保不换行 */
+            overflow: hidden; /* 隐藏溢出内容 */
+            width: 100%; /* 确保占满容器宽度 */
+            height: auto; /* 自适应高度 */
+        }}
+        .image-column {{ 
+            text-align: center; 
+            width: 48%; 
+            min-width: 0; /* 修复flexbox布局问题 */
+            box-sizing: border-box; /* 确保宽度计算正确 */
+            padding: 0 5px; /* 添加内边距 */
+            float: left; /* 辅助float布局确保左右排列 */
+        }}
+        img {{ 
+            max-width: 100%; 
+            height: auto; 
+            border: 1px solid #ddd; 
+            box-sizing: border-box; /* 确保宽度计算正确 */
+        }}
+        .info {{ 
+            text-align: center; 
+            color: #888; 
+            margin-top: 30px; 
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>天气预报对比</h1>
+        <h2>{vrbl_text} - {group_desc}</h2>
+        <div class="info">
+            <p>生成时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p>当前数据日期: {datetime.datetime.strptime(self.compare_dates['current'], '%Y%m%d').strftime('%Y-%m-%d')}</p>
+            <p>前一天数据日期: {datetime.datetime.strptime(self.compare_dates['previous'], '%Y%m%d').strftime('%Y-%m-%d')}</p>
+        </div>
         
-        # 添加每个地区的对比图（左右结构）
-        for today_path, yesterday_path, region, subregion in filtered_pairs:
-            # 手动处理特殊情况
-            # 对于国家层面的子地区（与国家名称相同），使用"全国"作为子地区名称
-            if subregion == region:
-                chinese_subregion = "全国"
-            else:
-                chinese_subregion = self.parser.get_chinese_region_name(subregion)
-            
-            # 获取中文地区名称
-            chinese_region = self.parser.get_chinese_region_name(region)
-            
-            # 添加地区标题
-            html_content.append(f"<h3>{chinese_region} - {chinese_subregion}</h3>")
-            
-            # 添加左右对比表格
-            html_content.append("<table>")
-            html_content.append("<tr>")
-            
-            # 左侧：前一天图片
-            html_content.append("<td>")
-            html_content.append(f"<h4>{self.yesterday_str}</h4>")
-            # 计算相对于HTML文件的正确图片路径
-            rel_yesterday_path = os.path.join("..", "..", yesterday_path)
-            html_content.append(f"<img src='{rel_yesterday_path}' alt='{self.yesterday_str}'>")
-            html_content.append("</td>")
-            
-            # 右侧：今天图片
-            html_content.append("<td>")
-            html_content.append(f"<h4>{self.today_str}</h4>")
-            # 计算相对于HTML文件的正确图片路径
-            rel_today_path = os.path.join("..", "..", today_path)
-            html_content.append(f"<img src='{rel_today_path}' alt='{self.today_str}'>")
-            html_content.append("</td>")
-            
-            html_content.append("</tr>")
-            html_content.append("</table>")
-            html_content.append("<div class='divider'></div>")
+        {images_html}
+    </div>
+</body>
+</html>"""
         
-        # 添加HTML尾部
-        html_content.append("</body>")
-        html_content.append("</html>")
+        # 写入HTML文件
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
         
-        # 将HTML内容写入文件
-        with open(html_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(html_content))
+        log(f"成功生成对比文档: {html_path}")
+        
+        # 转换为图片
+        self.convert_html_to_image(html_path)
         
         return html_path
-    
 
-    
-    def run(self):
-        """运行完整的汇总流程"""
-        # 下载今天的数据
-        print(f"\n=== 下载今天({self.today_str})的天气数据 ===")
-        pcp_results_today, tmp_results_today = self.download_weather_data(self.today_str)
+    def convert_html_to_image(self, html_path):
+        """将HTML文档转换为图片
         
-        # 检查是否已经存在昨天的图片，如果不存在再下载
-        print(f"\n=== 检查昨天({self.yesterday_str})的天气数据 ===")
-        # 检查降水数据是否存在
-        pcp_yesterday_dir = os.path.join("downloads", "pcp", self.yesterday_str)
-        pcp_yesterday_exists = os.path.exists(pcp_yesterday_dir) and len(os.listdir(pcp_yesterday_dir)) > 0
-        
-        # 检查温度数据是否存在
-        tmp_yesterday_dir = os.path.join("downloads", "tmp", self.yesterday_str)
-        tmp_yesterday_exists = os.path.exists(tmp_yesterday_dir) and len(os.listdir(tmp_yesterday_dir)) > 0
-        
-        if pcp_yesterday_exists and tmp_yesterday_exists:
-            print(f"昨天({self.yesterday_str})的天气数据已经存在，跳过下载")
-            pcp_results_yesterday = {}
-            tmp_results_yesterday = {}
-        else:
-            print(f"昨天({self.yesterday_str})的天气数据不存在或不完整，开始下载")
-            pcp_results_yesterday, tmp_results_yesterday = self.download_weather_data(self.yesterday_str)
-        
-        # 处理降水数据
-        print("\n=== 创建降水对比文档 ===")
-        pcp_image_pairs = self.find_image_pairs("pcp")
-        print(f"降水图片对数量: {len(pcp_image_pairs)}")
-        if pcp_image_pairs:
-            # 打印一些图片对的信息
-            print(f"图片对示例: {pcp_image_pairs[:3]}")
+        Args:
+            html_path: HTML文档路径
             
-            # 创建美国降水文档
-            pcp_usa_doc_path = self.create_comparison_document("pcp", pcp_image_pairs, group_type="usa")
-            print(f"美国降水文档路径: {pcp_usa_doc_path}")
-            if pcp_usa_doc_path:
-                print(f"[SUCCESS] 美国降水对比文档已生成: {pcp_usa_doc_path}")
-                # 检查文件是否存在
-                if os.path.exists(pcp_usa_doc_path):
-                    print(f"文件大小: {os.path.getsize(pcp_usa_doc_path)} 字节")
-                else:
-                    print(f"[ERROR] 文件不存在: {pcp_usa_doc_path}")
-                
-            # 创建其他国家降水文档
-            pcp_others_doc_path = self.create_comparison_document("pcp", pcp_image_pairs, group_type="others")
-            print(f"其他国家降水文档路径: {pcp_others_doc_path}")
-            if pcp_others_doc_path:
-                print(f"[SUCCESS] 其他国家降水对比文档已生成: {pcp_others_doc_path}")
-                # 检查文件是否存在
-                if os.path.exists(pcp_others_doc_path):
-                    print(f"文件大小: {os.path.getsize(pcp_others_doc_path)} 字节")
-                else:
-                    print(f"[ERROR] 文件不存在: {pcp_others_doc_path}")
-        else:
-            print("没有找到降水图片对，无法生成对比文档")
-        
-        # 处理温度数据
-        print("\n=== 创建温度对比文档 ===")
-        tmp_image_pairs = self.find_image_pairs("tmp")
-        print(f"温度图片对数量: {len(tmp_image_pairs)}")
-        if tmp_image_pairs:
-            # 创建美国温度文档
-            tmp_usa_doc_path = self.create_comparison_document("tmp", tmp_image_pairs, group_type="usa")
-            print(f"美国温度文档路径: {tmp_usa_doc_path}")
-            if tmp_usa_doc_path:
-                print(f"[SUCCESS] 美国温度对比文档已生成: {tmp_usa_doc_path}")
-                # 检查文件是否存在
-                if os.path.exists(tmp_usa_doc_path):
-                    print(f"文件大小: {os.path.getsize(tmp_usa_doc_path)} 字节")
-                else:
-                    print(f"[ERROR] 文件不存在: {tmp_usa_doc_path}")
-                
-            # 创建其他国家温度文档
-            tmp_others_doc_path = self.create_comparison_document("tmp", tmp_image_pairs, group_type="others")
-            print(f"其他国家温度文档路径: {tmp_others_doc_path}")
-            if tmp_others_doc_path:
-                print(f"[SUCCESS] 其他国家温度对比文档已生成: {tmp_others_doc_path}")
-                # 检查文件是否存在
-                if os.path.exists(tmp_others_doc_path):
-                    print(f"文件大小: {os.path.getsize(tmp_others_doc_path)} 字节")
-                else:
-                    print(f"[ERROR] 文件不存在: {tmp_others_doc_path}")
-        else:
-            print("没有找到温度图片对，无法生成对比文档")
-        
-        print("\n=== 开始转换HTML文档为图片 ===")
-        
-        # 转换所有生成的HTML文档为图片
-        html_files = [
-            os.path.join(self.today_output_dir, f"weather_summary_pcp_usa_{self.today_str}.html"),
-            os.path.join(self.today_output_dir, f"weather_summary_pcp_others_{self.today_str}.html"),
-            os.path.join(self.today_output_dir, f"weather_summary_tmp_usa_{self.today_str}.html"),
-            os.path.join(self.today_output_dir, f"weather_summary_tmp_others_{self.today_str}.html")
-        ]
-        
-        # 使用html_to_image.py脚本转换图片
-        # 尝试自动检测wkhtmltoimage路径
-        wkhtmltoimage_path = None
-        
-        # 获取当前执行目录和项目根目录
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(current_dir)  # 项目根目录是weather_spider目录的父目录
-        
-        potential_paths = [
-            # 当前执行目录
-            os.path.join(current_dir, "wkhtmltoimage.exe"),
-            # 当前执行目录的子目录
-            os.path.join(current_dir, "bin", "wkhtmltoimage.exe"),
-            os.path.join(current_dir, "wkhtmltopdf", "bin", "wkhtmltoimage.exe"),
-            # 项目根目录的bin目录（我们将wkhtmltoimage.exe放在这里）
-            os.path.join(project_root, "bin", "wkhtmltoimage.exe")
-        ]
-        
-        for path in potential_paths:
-            if os.path.exists(path):
-                wkhtmltoimage_path = path
-                print(f"[INFO] 自动检测到wkhtmltoimage路径: {wkhtmltoimage_path}")
-                break
-        
-        # 如果没有检测到wkhtmltoimage路径，提示用户
-        if wkhtmltoimage_path is None:
-            print("[WARNING] 未自动检测到wkhtmltoimage路径")
-            print("请确保wkhtmltoimage已安装并在系统PATH中，或通过命令行参数指定路径")
-            print("\n转换图片功能将被跳过...")
-            return
-        
-        # 直接导入html_to_image功能
+        Returns:
+            str: 生成的图片路径
+        """
+        if not html_path:
+            return None
+            
+        # 检查是否存在imgkit
         try:
             import imgkit
-        except ImportError as e:
-            print(f"[ERROR] 缺少依赖: {e}")
-            print("请安装必要的依赖: pip install imgkit")
-            return
+        except ImportError:
+            log("警告: 未安装imgkit库，跳过图片转换")
+            return None
         
-        for html_file in html_files:
-            if os.path.exists(html_file):
-                print(f"\n转换 {html_file} 为图片...")
-                try:
-                    # 直接调用html_to_image函数转换图片
-                    output_path = f"{os.path.splitext(html_file)[0]}.png"
-                    
-                    # 设置转换选项
-                    options = {
-                        'width': '1200',
-                        'disable-smart-width': '',
-                        'encoding': 'UTF-8',
-                        'quiet': '',  # 减少输出
-                        'enable-local-file-access': ''
-                    }
-                    
-                    # 配置imgkit
-                    if wkhtmltoimage_path and os.path.exists(wkhtmltoimage_path):
-                        imgkit_config = imgkit.config(wkhtmltoimage=wkhtmltoimage_path)
-                    else:
-                        imgkit_config = None
-                    
-                    # 执行转换
-                    imgkit.from_file(html_file, output_path, options=options, config=imgkit_config)
-                    
-                    print(f"[SUCCESS] 成功将HTML转换为图片: {output_path}")
-                    print(f"[INFO] 图片宽度: 1200px，高度: 自动计算")
-                except Exception as e:
-                    print(f"[ERROR] 转换 {html_file} 失败: {e}")
+        # 检查是否存在wkhtmltoimage
+        try:
+            # 尝试使用相对路径
+            bin_path = os.path.join(os.path.dirname(__file__), "..", "bin", "wkhtmltoimage.exe")
+            if os.path.exists(bin_path):
+                config = imgkit.config(wkhtmltoimage=bin_path)
+                log(f"使用本地wkhtmltoimage: {bin_path}")
             else:
-                print(f"[WARNING] HTML文件不存在: {html_file}")
+                log(f"警告: 无法找到wkhtmltoimage: {bin_path} 不存在")
+                return None
+        except Exception as e:
+            log(f"警告: 无法找到wkhtmltoimage: {e}")
+            return None
         
-        print(f"\n=== 汇总完成 ===")
+        log(f"将HTML转换为图片: {html_path}")
+        
+        # 生成图片路径
+        img_path = html_path.replace(".html", ".png")
+        
+        try:
+            # 使用imgkit转换，添加更多选项确保布局正确
+            imgkit.from_file(html_path, img_path, config=config, options={
+                "width": 2000,  # 大幅增加宽度确保左右布局不折叠
+                "zoom": 1.0,  # 缩放比例
+                "enable-local-file-access": "",  # 允许访问本地文件
+                "disable-smart-width": "",  # 禁用智能宽度调整
+                "no-stop-slow-scripts": "",  # 不禁用缓慢脚本
+                "minimum-font-size": 12  # 确保文字清晰
+            })
+            
+            log(f"成功生成图片: {img_path}")
+            return img_path
+        except Exception as e:
+            log(f"图片转换失败: {e}")
+            return None
+
+    def run(self):
+        """运行每日天气总结的主要流程"""
+        log(f"\n=== 开始每日天气总结流程 ===")
+        log(f"当前时间: {datetime.datetime.now()}")
+        log(f"比较日期: {self.compare_dates['previous']} vs {self.compare_dates['current']}")
+        log(f"保存目录: {self.output_dir}")
+        
+        # 下载当天和前一天的大豆降水预报图片
+        log(f"\n开始下载大豆降水预报图片...")
+        
+        # 大豆的crop_index是1
+        soybean_crop_index = 1
+        # 默认使用15天预报
+        forecast_days = 15
+        
+        # 只下载当前需要保存日期的数据
+        target_date = self.compare_dates['current']
+        
+        # 下载降水数据
+        self.downloader.download_all_images_by_crop(
+            crop_index=soybean_crop_index,
+            vrbl="pcp",
+            nday=forecast_days,
+            date_str=target_date
+        )
+        
+        # 下载温度数据
+        self.downloader.download_all_images_by_crop(
+            crop_index=soybean_crop_index,
+            vrbl="tmp",
+            nday=forecast_days,
+            date_str=target_date
+        )
+        
+        log(f"\n图片下载完成")
+        
+        # 处理降水数据
+        self.process_weather_data("pcp")
+        
+        # 处理温度数据
+        self.process_weather_data("tmp")
+        
+        log(f"\n=== 每日天气总结流程完成 ===")
 
 
 def main():
     """主函数，用于支持命令行调用"""
     summary = DailyWeatherSummary()
     summary.run()
-
 
 if __name__ == "__main__":
     main()
