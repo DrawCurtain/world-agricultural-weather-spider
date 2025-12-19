@@ -1,154 +1,143 @@
-# 大豆作物天气预报对比系统
+# 全球农业天气数据爬虫
 
-## 项目描述
-该项目是一个自动化的大豆作物天气预报对比系统，用于下载、分析和对比全球主要大豆产区的15天天气预报数据，生成直观的对比文档。
+## 项目简介
 
-## 功能特性
+本项目用于爬取全球主要农业地区的天气预报数据（包括降水和温度），生成对比图片供农业分析使用。
 
-- **自动化数据下载**：自动从世界农业气象网站下载全球主要大豆产区的降水和温度预报图片
-- **智能数据检查**：优先检查本地是否已存在前一天数据，避免重复下载，提高效率
-- **日期对比分析**：支持将当天预报数据与前一天进行对比分析
-- **图片对比展示**：生成左右对比的HTML文档，直观展示预报变化
-- **分类组织**：按国家和地区分类展示预报数据，支持美国和其他国家单独查看
-- **批量图片转换**：支持将HTML文档转换为PNG图片格式
-- **日期目录结构**：按日期组织输出文件，方便查阅和管理
-- **可执行文件**：提供Windows平台的可执行文件，无需安装Python环境即可运行
+## 功能特点
 
-## 安装说明
+- 自动下载美国、巴西、阿根廷等主要农业地区的天气预报数据
+- 支持降水（pcp）和温度（tmp）两种天气类型
+- 生成前一天和当天的天气对比图片
+- 使用PIL库直接生成高质量图片，无需HTML转换
+- 按地区分类生成对比报告（美国、巴西、阿根廷等）
+- 自动根据时间判断下载当天的数据还是昨天的数据
 
-### 方法一：使用Python源代码
+## 项目结构
 
-1. **克隆仓库**
-   ```bash
-   git clone <仓库地址>
-   cd spiderMan
-   ```
+```
+world-agricultural-weather-spider/
+├── weather_spider/              # 核心代码目录
+│   ├── __init__.py
+│   ├── daily_summary.py         # 主要流程控制
+│   ├── downloader.py            # 图片下载模块
+│   ├── parser.py                # 数据解析模块
+│   └── image_generator.py       # 图片生成模块
+├── downloads/                   # 下载的原始图片存储目录
+│   ├── pcp/                     # 降水数据
+│   │   ├── 20251218/            # 按日期存储
+│   │   └── 20251217/
+│   └── tmp/                     # 温度数据
+│       ├── 20251218/
+│       └── 20251217/
+├── output/                      # 生成的对比图片存储目录
+│   └── 20251218/                # 按日期存储
+├── bin/                         # 可执行文件目录
+├── requirements.txt             # 项目依赖
+├── setup.py                     # 安装配置
+├── README.md                    # 项目说明
+└── README_EXE.md                # 可执行版本说明
+```
 
-2. **安装依赖**
-   使用requirements.txt安装所有依赖：
-   ```bash
-   pip install -r requirements.txt
-   ```
+## 安装与使用
 
-3. **关于wkhtmltoimage**
-   - Windows：项目已内置`bin/wkhtmltoimage.exe`，无需额外安装
-   - Linux：`sudo apt-get install wkhtmltopdf`
-   - macOS：`brew install wkhtmltopdf`
+### 环境要求
 
-### 方法二：使用可执行文件（仅Windows）
+- Python 3.7+
+- 网络连接（用于下载数据）
 
-直接从项目的`dist`目录下载`daily_summary.exe`文件即可使用，无需安装Python环境。
+### 安装依赖
 
-## 使用方法
+```bash
+pip install -r requirements.txt
+```
 
-### 使用Python源代码
+### 运行方法
 
-#### 基本使用
-
-使用模块方式运行主程序：
+#### 方法1：使用Python模块方式运行
 
 ```bash
 python -m weather_spider.daily_summary
 ```
 
-脚本将自动执行以下操作：
-1. 下载当天和前一天的天气预报图片
-2. 生成天气对比HTML文档
-3. 将HTML文档转换为PNG图片
-4. 将输出文件保存到`output/[日期]/`目录
+#### 方法2：使用可执行文件（Windows）
 
-#### 指定日期
+1. 运行 `build_exe.bat` 生成可执行文件
+2. 双击运行 `bin/天气爬虫.exe`
 
-可以使用`-d`或`--date`参数指定日期：
+## 输出说明
 
-```bash
-python -m weather_spider.daily_summary -d 20231216
-```
+程序运行后会生成以下对比图片：
 
-#### 指定wkhtmltoimage路径
+- `weather_summary_pcp_usa_YYYYMMDD.png` - 美国降水预报对比
+- `weather_summary_tmp_usa_YYYYMMDD.png` - 美国温度预报对比
+- `weather_summary_pcp_brazil_YYYYMMDD.png` - 巴西降水预报对比
+- `weather_summary_tmp_brazil_YYYYMMDD.png` - 巴西温度预报对比
+- `weather_summary_pcp_argentina_YYYYMMDD.png` - 阿根廷降水预报对比
+- `weather_summary_tmp_argentina_YYYYMMDD.png` - 阿根廷温度预报对比
 
-如果内置的wkhtmltoimage无法正常工作，可以使用`-w`或`--wkhtmltoimage`参数指定路径：
+### 图片布局说明
 
-```bash
-python -m weather_spider.daily_summary -w "C:\Custom\Path\to\wkhtmltoimage.exe"
-```
+生成的对比图片包含：
 
-#### 清理环境
+1. **主标题**：地区+天气类型对比（如"美国降水预报对比"）
+2. **生成时间**：图片生成的时间戳（右上角）
+3. **日期信息**：当前数据和前一期数据的日期（居中）
+4. **地区标题**：具体地区名称（如"美国 - 爱荷华州 降水预报"）
+5. **对比图片**：前一天（左）和当天（右）的天气预报图
 
-如果需要清理下载的图片和输出文件，可以运行清理脚本：
+### 时间规则
 
-```bash
-python -m weather_spider.cleanup_files
-```
+- **19:30前**：下载昨天的数据，保存到昨天的文件夹
+- **19:30后**：下载今天的数据，保存到今天的文件夹
 
-### 使用可执行文件
+## 技术实现
 
-在Windows系统中，直接运行`weather_spider.exe`文件即可：
+### 核心改进
 
-```bash
-.\weather_spider.exe
-```
+1. **直接图片生成**：
+   - 使用PIL库直接生成对比图片
+   - 去除了HTML转图片的中间步骤
+   - 提高了生成效率和图片质量
 
-支持的命令行参数与Python版本相同：
+2. **优化的布局**：
+   - 大标题：60px，加粗
+   - 地区标题：48px，加粗
+   - 图片放大2.5倍，确保清晰度
+   - 自动居中布局，合理利用画布空间
 
-```bash
-.\weather_spider.exe -d 20231216 -w "C:\Custom\Path\to\wkhtmltoimage.exe"
-```
+3. **灵活的配置**：
+   - `IMAGE_SCALE_FACTOR`：图片缩放因子（默认2.5）
+   - `CANVAS_WIDTH`：画布宽度（默认3200px）
+   - `GAP_BETWEEN_IMAGES`：图片间距（默认20px）
 
-## 项目结构
+### 主要模块
 
-```
-spiderMan/
-├── README.md           # 项目说明文档
-├── README_EXE.md       # 可执行文件使用说明
-├── requirements.txt    # Python依赖列表
-├── setup.py            # 项目安装配置
-├── .gitignore          # Git忽略规则
-├── bin/
-│   └── wkhtmltoimage.exe  # Windows平台HTML转图片工具
-├── dist/
-│   └── weather_spider.exe  # 生成的Windows可执行文件
-└── weather_spider/
-    ├── __init__.py     # 包初始化文件
-    ├── __main__.py     # 包入口点
-    ├── daily_summary.py    # 主程序入口
-    ├── downloader.py       # 图片下载模块
-    ├── parser.py           # 数据解析模块
-    ├── html_to_image.py    # HTML转图片模块
-    ├── network.py          # 网络请求模块
-    └── cleanup_files.py    # 环境清理脚本
-```
-
-## 输出文件说明
-
-脚本执行后，输出文件将保存在以下目录：
-
-- 下载的图片：`downloads/[类型]/[日期]/`
-  - `类型`包括：`pcp`（降水）和`tmp`（温度）
-
-- 生成的文档：`output/[日期]/`
-  - `weather_summary_pcp_usa_[日期].html`：美国大豆产区降水预报对比HTML
-  - `weather_summary_pcp_others_[日期].html`：其他国家大豆产区降水预报对比HTML
-  - `weather_summary_tmp_usa_[日期].html`：美国大豆产区温度预报对比HTML
-  - `weather_summary_tmp_others_[日期].html`：其他国家大豆产区温度预报对比HTML
-  - 对应的PNG图片文件：由HTML文档转换而来
-
-## 依赖项
-
-- Python 3.6+（仅源代码版本需要）
-- requests：用于网络请求
-- BeautifulSoup4：用于HTML解析
-- imgkit：用于HTML转图片
-- wkhtmltoimage：用于HTML转图片（内置Windows版本）
+- **DailyWeatherSummary**：主流程控制类
+- **ImageDownloader**：负责下载天气图片
+- **WeatherParser**：解析天气数据
+- **ImageGenerator**：生成对比图片
 
 ## 注意事项
 
-1. 首次运行时，由于没有前一天的数据，系统会使用当天的数据进行对比
-2. 系统默认使用当前日期作为基准日期
-3. 如果网络连接不稳定，可能会导致图片下载失败
-4. Windows用户优先使用内置的wkhtmltoimage工具，无需额外安装
-5. 使用可执行文件时，所有输出文件将保存在可执行文件所在目录
+1. 程序需要稳定的网络连接以下载数据
+2. 生成的图片较大，请确保有足够的磁盘空间
+3. 如果某天的数据还未更新，程序会使用前一天的数据
 
-## 许可证
+## 常见问题
 
-MIT License
+Q: 程序运行失败怎么办？
+A: 检查网络连接和依赖是否正确安装，查看日志文件了解具体错误。
+
+Q: 可以修改下载的地区吗？
+A: 可以在 `downloader.py` 中修改地区列表和对应的URL。
+
+Q: 如何调整图片大小？
+A: 修改 `image_generator.py` 中的配置参数（IMAGE_SCALE_FACTOR、CANVAS_WIDTH等）。
+
+## 更新日志
+
+- 2025-12-19: 重构图片生成逻辑，使用PIL直接生成图片，提高效率和品质
+- 2025-12-18: 优化图片布局，增大字体，改进显示效果
+- 2025-12-17: 修复日期逻辑和路径问题
+- 2025-12-16: 初始版本，支持基本的图片下载和对比功能
