@@ -80,8 +80,9 @@ jobs:
         echo "目录内容:"
         ls -la
 
-        # 运行脚本
-        python -u run_weather_spider.py 2>&1 | tee execution.log
+        # 运行脚本：将所有输出重定向到文件，避免GitHub Actions解析错误
+        # 使用>重定向stdout，2>&1重定向stderr到stdout
+        python -u run_weather_spider.py > execution.log 2>&1
 
         echo "脚本执行完成"
         echo "生成文件列表:"
