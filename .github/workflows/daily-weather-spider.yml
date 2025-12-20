@@ -85,8 +85,7 @@ jobs:
         python -u run_weather_spider.py > execution.log 2>&1
 
         echo "脚本执行完成"
-        echo "生成文件列表:"
-        find output -type f ! -name '.gitkeep' 2>/dev/null || echo "未找到输出文件"
+        # 文件列表将通过artifact上传，避免在GitHub Actions输出中显示以防止解析错误
       continue-on-error: false
 
     - name: Check if outputs exist
@@ -113,8 +112,7 @@ jobs:
         echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
         if [ "${{ steps.check-outputs.outputs.has_outputs }}" == "true" ]; then
           echo "- Output files generated: Yes" >> $GITHUB_STEP_SUMMARY
-          echo "- Output directory contents:" >> $GITHUB_STEP_SUMMARY
-          ls -la output/ >> $GITHUB_STEP_SUMMARY
+          echo "- Files have been uploaded as artifacts" >> $GITHUB_STEP_SUMMARY
         else
           echo "- Output files generated: No" >> $GITHUB_STEP_SUMMARY
         fi
