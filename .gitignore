@@ -2,31 +2,70 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
 
-# 下载的图片和文档
+# 构建和打包相关
 build/
-downloads/
 dist/
-*.docx
-*.pdf
+*.spec
+pyinstaller/
 
-# 日志文件
+# PyInstaller相关
+*.manifest
+*.exe
+
+# 下载的原始数据（保留目录结构）
+downloads/pcp/*
+downloads/tmp/*
+!downloads/pcp/.gitkeep
+!downloads/tmp/.gitkeep
+
+# 生成的输出文件（保留目录结构）
+output/*
+!output/.gitkeep
+
+# 日志文件（开发时）
+debug.log
 *.log
 
 # 配置文件
 .env
 *.ini
 *.cfg
-*.spec
 
 # 操作系统文件
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # 临时文件
-~$*.docx
+~$*
 *.tmp
 *.temp
+*.swp
+*.swo
+*~
 
-# 输出文件夹
-output/
+# IDE相关
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 缓存文件
+.cache/
+*.cache
+
+# 测试相关
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# 文档相关（除README外）
+*.pdf
+*.docx
+*.doc
+*.xls
+*.xlsx
+MANUAL_UPLOAD_GUIDE.md

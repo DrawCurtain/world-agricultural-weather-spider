@@ -4,12 +4,11 @@ import datetime
 from .downloader import ImageDownloader
 from .parser import WeatherParser
 from .image_generator import create_image_comparison
-
-# 设置日志文件
-log_file = "debug.log"
+from .config import config
 
 def log(message):
     """将日志信息写入文件"""
+    log_file = config.log_file
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
     print(message)
@@ -20,12 +19,12 @@ class DailyWeatherSummary:
     def __init__(self):
         self.downloader = ImageDownloader()
         self.parser = WeatherParser()
-        
-        # 获取当前时间
-        now = datetime.datetime.now()
-        cutoff_time = now.replace(hour=19, minute=30, second=0, microsecond=0)
-        
-        if now < cutoff_time:
+
+        # 使用配置获取当前时间
+        now = config.get_current_time()
+
+        # 判断是否应该下载前一天的数据
+        if config.should_download_previous_day(now):
             # 七点半前，下载昨天的数据，保存到昨天的文件夹
             self.save_date = now - datetime.timedelta(days=1)
             self.compare_dates = {
@@ -39,14 +38,18 @@ class DailyWeatherSummary:
                 'previous': (now - datetime.timedelta(days=1)).strftime('%Y%m%d'),
                 'current': self.save_date.strftime('%Y%m%d')
             }
-            
+
         self.save_date_str = self.save_date.strftime('%Y%m%d')
         self.output_dir = os.path.join('output', self.save_date_str)
-        
+
         # 创建输出目录
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
             log(f"创建输出目录: {self.output_dir}")
+
+        log(f"时区设置: {config.timezone}")
+        log(f"运行模式: {config.mode}")
+        log(f"当前时间: {now.strftime('%Y-%m-%d %H:%M:%S')}")
     
     def download_weather_data(self, date_str):
         """下载指定日期的天气数据

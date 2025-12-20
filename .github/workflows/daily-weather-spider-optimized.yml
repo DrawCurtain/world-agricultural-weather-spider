@@ -1,0 +1,126 @@
+name: Daily Weather Spider
+
+on:
+  schedule:
+    # 每天北京时间晚上7:30运行 (UTC时间 11:30)
+    - cron: '30 11 * * *'
+  workflow_dispatch: # 允许手动触发
+
+env:
+  PYTHONUNBUFFERED: '1'
+  TZ: 'Asia/Shanghai'  # 设置时区为北京时间
+
+jobs:
+  run-weather-spider:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set timezone
+      run: |
+        sudo timedatectl set-timezone Asia/Shanghai
+        date
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install retrying  # 添加重试库
+
+    - name: Create necessary directories
+      run: |
+        mkdir -p downloads/pcp
+        mkdir -p downloads/tmp
+        mkdir -p output
+        mkdir -p weather  # 创建weather目录以防代码需要
+
+    - name: Set environment variables for network
+      run: |
+        echo "REQUEST_TIMEOUT=30" >> $GITHUB_ENV
+        echo "MAX_RETRIES=3" >> $GITHUB_ENV
+        echo "RETRY_DELAY=5" >> $GITHUB_ENV
+
+    - name: Run weather spider
+      run: |
+        # 设置环境变量
+        export WEATHER_SPIDER_MODE="github_actions"
+        export WEATHER_SPIDER_TIMEZONE="Asia/Shanghai"
+
+        # 运行脚本
+        python -u run_weather_spider.py
+      continue-on-error: false
+
+    - name: Check if outputs exist
+      id: check-outputs
+      run: |
+        if [ -d "output" ] && [ "$(ls -A output)" ]; then
+          echo "has_outputs=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_outputs=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create summary
+      if: always()
+      run: |
+        echo "## Weather Spider Execution Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- Date: $(date '+%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_STEP_SUMMARY
+        echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.check-outputs.outputs.has_outputs }}" == "true" ]; then
+          echo "- Output files generated: Yes" >> $GITHUB_STEP_SUMMARY
+          echo "- Output directory contents:" >> $GITHUB_STEP_SUMMARY
+          ls -la output/ >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- Output files generated: No" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # 显示日志文件的最后50行
+        if [ -f "debug.log" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Last 50 lines of debug log:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -n 50 debug.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload output artifacts
+      uses: actions/upload-artifact@v3
+      if: steps.check-outputs.outputs.has_outputs == 'true'
+      with:
+        name: weather-outputs-${{ github.run_number }}
+        path: |
+          output/
+          debug.log
+        retention-days: 30
+
+    - name: Create release (optional)
+      if: success() && steps.check-outputs.outputs.has_outputs == 'true'
+      run: |
+        # 创建包含日期的标签（可选）
+        TAG_NAME="weather-data-$(date +'%Y%m%d')"
+
+        # 检查标签是否已存在
+        if ! git rev-parse --verify "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+          # 创建发布
+          gh release create "$TAG_NAME" \
+            --title "Weather Data $(date +'%Y-%m-%d')" \
+            --notes "Automated weather data update for $(date +'%Y-%m-%d %H:%M:%S')" \
+            --prerelease \
+            output/*
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
