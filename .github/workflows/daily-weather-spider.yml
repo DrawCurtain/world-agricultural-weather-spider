@@ -75,17 +75,33 @@ jobs:
         export WEATHER_SPIDER_MODE="github_actions"
         export WEATHER_SPIDER_TIMEZONE="Asia/Shanghai"
 
+        echo "开始运行天气爬虫..."
+        echo "当前目录: $(pwd)"
+        echo "目录内容:"
+        ls -la
+
         # 运行脚本
-        python -u run_weather_spider.py
+        python -u run_weather_spider.py 2>&1 | tee execution.log
+
+        echo "脚本执行完成"
+        echo "生成文件列表:"
+        find output -type f ! -name '.gitkeep' 2>/dev/null || echo "未找到输出文件"
       continue-on-error: false
 
     - name: Check if outputs exist
       id: check-outputs
       run: |
-        if [ -d "output" ] && [ "$(ls -A output)" ]; then
-          echo "has_outputs=true" >> $GITHUB_OUTPUT
-        else
-          echo "has_outputs=false" >> $GITHUB_OUTPUT
+        # 初始化输出变量
+        echo "has_outputs=false" >> $GITHUB_OUTPUT
+
+        # 检查output目录是否存在且有内容
+        if [ -d "output" ] && [ "$(ls -A output 2>/dev/null)" ]; then
+          # 排除.gitkeep文件
+          file_count=$(find output -type f ! -name '.gitkeep' 2>/dev/null | wc -l)
+          if [ "$file_count" -gt 0 ]; then
+            echo "has_outputs=true" >> $GITHUB_OUTPUT
+            echo "Found $file_count output files"
+          fi
         fi
 
     - name: Create summary
