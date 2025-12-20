@@ -9,6 +9,9 @@ on:
 env:
   PYTHONUNBUFFERED: '1'
   TZ: 'Asia/Shanghai'  # 设置时区为北京时间
+  # 禁用GitHub Actions调试输出，避免特殊字符被误解为命令
+  ACTIONS_STEP_DEBUG: false
+  ACTIONS_RUNNER_DEBUG: false
 
 jobs:
   run-weather-spider:
