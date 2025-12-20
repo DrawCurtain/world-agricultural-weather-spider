@@ -35,17 +35,25 @@ def test_log_format():
             if "[" in content and "]" in content:
                 issues.append("方括号")
             # 检查是否有管道符
-            if "|" in content:
+            if " | " in content:
                 issues.append("管道符")
+            # 检查是否使用了正确的分隔符
+            if " - " not in content:
+                issues.append("缺少正确的分隔符")
 
             if issues:
-                print(f"\n⚠️ 警告：日志中包含可能引起问题的字符: {', '.join(issues)}")
+                print(f"\nWarning: Log contains problematic characters: {', '.join(issues)}")
+                return False
             else:
-                print("\n✅ 日志格式正确，不包含可能引起问题的特殊字符")
+                print("\nSuccess: Log format is correct")
+                return True
 
     # 清理测试日志
     if os.path.exists("debug.log"):
         os.remove("debug.log")
 
+    return True
+
 if __name__ == "__main__":
-    test_log_format()
+    success = test_log_format()
+    sys.exit(0 if success else 1)
