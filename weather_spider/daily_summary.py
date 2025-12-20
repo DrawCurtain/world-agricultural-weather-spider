@@ -10,7 +10,19 @@ def log(message):
     """将日志信息写入文件"""
     log_file = config.log_file
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    # 使用短横线代替管道符，避免被GitHub Actions误解为YAML语法
+
+    # 在GitHub Actions模式下，对所有特殊字符进行转义以避免被误解为命令
+    if config.mode == 'github_actions':
+        # 转义所有可能导致GitHub Actions误解的字符
+        message = message.replace('output/', '[output]_path_')
+        message = message.replace('downloads/', '[downloads]_path_')
+        # 转义冒号（使用全角冒号代替）
+        message = message.replace(':', '：')
+        # 转义其他可能的特殊字符
+        message = message.replace('|', '\\|')
+        message = message.replace('::', '：：')
+
+    # 使用短横线分隔符写入日志
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"{timestamp} - {message}\n")
 
