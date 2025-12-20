@@ -42,12 +42,11 @@ jobs:
           ${{ runner.os }}-pip-
 
     - name: Restore weather data downloads
-      id: restore-downloads
       uses: actions/download-artifact@v4
       with:
         name: weather-downloads-latest
         path: downloads
-        continue-on-error: true
+      continue-on-error: true
 
     - name: Install dependencies
       run: |
