@@ -49,6 +49,20 @@ jobs:
         mkdir -p output
         mkdir -p weather  # 创建weather目录以防代码需要
 
+    - name: Clean up old files
+      run: |
+        # 设置保留天数（可通过环境变量自定义）
+        RETENTION_DAYS=${RETENTION_DAYS:-7}
+        echo "清理 $RETENTION_DAYS 天前的文件"
+
+        # 使用清理脚本
+        chmod +x .github/cleanup-config.sh
+        .github/cleanup-config.sh
+
+        # 显示清理后的空间使用情况
+        echo "清理后的磁盘使用情况："
+        du -sh downloads output 2>/dev/null || true
+
     - name: Set environment variables for network
       run: |
         echo "REQUEST_TIMEOUT=30" >> $GITHUB_ENV
