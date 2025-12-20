@@ -12,6 +12,8 @@ env:
   # 禁用GitHub Actions调试输出，避免特殊字符被误解为命令
   ACTIONS_STEP_DEBUG: false
   ACTIONS_RUNNER_DEBUG: false
+  # 禁用GitHub Actions命令处理，避免路径被误解为命令
+  ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
 
 jobs:
   run-weather-spider:

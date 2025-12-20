@@ -26,10 +26,11 @@ def log(message):
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"{timestamp} - {message}\n")
 
-    # 在GitHub Actions环境中，避免向stdout输出以防止特殊字符导致解析错误
+    # 在GitHub Actions环境中，完全禁用stdout输出以防止GitHub Actions解析错误
     # 仅在非GitHub Actions环境或调试模式下输出到控制台
     if config.mode != 'github_actions':
         print(message)
+    # 在GitHub Actions模式下，什么都不做（禁用所有输出）
 
 class DailyWeatherSummary:
     """每日天气数据汇总模块，用于生成今天和前一天的天气对比Word文档"""
