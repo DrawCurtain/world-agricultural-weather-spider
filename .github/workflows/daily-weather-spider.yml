@@ -78,6 +78,9 @@ jobs:
         export WEATHER_SPIDER_MODE="github_actions"
         export WEATHER_SPIDER_TIMEZONE="Asia/Shanghai"
 
+        # 禁用Shell回显，避免显示命令执行过程
+        set +x
+
         # 运行脚本：将所有输出重定向到文件，避免GitHub Actions解析错误
         python -u run_weather_spider.py > execution.log 2>&1
 
