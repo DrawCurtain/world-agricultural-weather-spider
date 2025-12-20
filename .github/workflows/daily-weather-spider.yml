@@ -131,20 +131,5 @@ jobs:
           file_count.log
         retention-days: 30
 
-    - name: Create release (optional)
-      if: success() && steps.check-outputs.outputs.has_outputs == 'true'
-      run: |
-        # 创建包含日期的标签（可选）
-        TAG_NAME="weather-data-$(date +'%Y%m%d')"
-
-        # 检查标签是否已存在
-        if ! git rev-parse --verify "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
-          # 创建发布
-          gh release create "$TAG_NAME" \
-            --title "Weather Data $(date +'%Y-%m-%d')" \
-            --notes "Automated weather data update for $(date +'%Y-%m-%d %H:%M:%S')" \
-            --prerelease \
-            output/*
-        fi
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # 注意：Create release 步骤已移除，因为它需要额外的权限
+    # 所有输出文件已通过 artifacts 上传，无需额外创建 release
