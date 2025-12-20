@@ -19,11 +19,9 @@ class WeatherSpiderConfig:
         self.max_retries = int(os.getenv('MAX_RETRIES', '3'))
         self.retry_delay = int(os.getenv('RETRY_DELAY', '5'))
 
-        # GitHub Actions特定配置
-        if self.mode == 'github_actions':
-            self.log_file = os.getenv('GITHUB_OUTPUT', 'debug.log')
-        else:
-            self.log_file = 'debug.log'
+        # 日志文件始终使用 debug.log
+        # 在GitHub Actions中，日志会通过artifact上传，不需要特殊处理
+        self.log_file = 'debug.log'
 
     def get_current_time(self) -> datetime.datetime:
         """获取当前时间（考虑时区）"""
