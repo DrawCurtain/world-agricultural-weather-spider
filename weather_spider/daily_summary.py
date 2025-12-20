@@ -13,7 +13,11 @@ def log(message):
     # 使用短横线代替管道符，避免被GitHub Actions误解为YAML语法
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"{timestamp} - {message}\n")
-    print(message)
+
+    # 在GitHub Actions环境中，避免向stdout输出以防止特殊字符导致解析错误
+    # 仅在非GitHub Actions环境或调试模式下输出到控制台
+    if config.mode != 'github_actions':
+        print(message)
 
 class DailyWeatherSummary:
     """每日天气数据汇总模块，用于生成今天和前一天的天气对比Word文档"""
