@@ -30,11 +30,18 @@ def test_log_format():
             print("\n日志内容:")
             print(content)
 
+            issues = []
             # 检查是否有方括号
             if "[" in content and "]" in content:
-                print("\n⚠️ 警告：日志中包含方括号，可能被GitHub Actions误解")
+                issues.append("方括号")
+            # 检查是否有管道符
+            if "|" in content:
+                issues.append("管道符")
+
+            if issues:
+                print(f"\n⚠️ 警告：日志中包含可能引起问题的字符: {', '.join(issues)}")
             else:
-                print("\n✅ 日志格式正确，不包含方括号")
+                print("\n✅ 日志格式正确，不包含可能引起问题的特殊字符")
 
     # 清理测试日志
     if os.path.exists("debug.log"):

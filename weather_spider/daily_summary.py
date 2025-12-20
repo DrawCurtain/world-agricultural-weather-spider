@@ -10,9 +10,9 @@ def log(message):
     """将日志信息写入文件"""
     log_file = config.log_file
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    # 避免使用方括号，防止被GitHub Actions误解为输出命令
+    # 使用短横线代替管道符，避免被GitHub Actions误解为YAML语法
     with open(log_file, "a", encoding="utf-8") as f:
-        f.write(f"{timestamp} | {message}\n")
+        f.write(f"{timestamp} - {message}\n")
     print(message)
 
 class DailyWeatherSummary:
