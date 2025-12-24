@@ -87,10 +87,20 @@ jobs:
           if [ -n "$(ls -A downloads_temp/ 2>/dev/null)" ]; then
             echo "正在合并历史数据到downloads目录..."
 
-            # 检查是否包含downloads目录本身
-            if [ -d "downloads_temp/downloads" ]; then
-              # 如果downloads_temp下有downloads目录，直接使用它
-              echo "发现嵌套的downloads目录，展开..."
+            # 处理多层嵌套的downloads目录
+            SOURCE_DIR="downloads_temp"
+            while [ -d "$SOURCE_DIR/downloads" ]; do
+              echo "发现嵌套的downloads目录，展开层级..."
+              SOURCE_DIR="$SOURCE_DIR/downloads"
+            done
+
+            # 如果找到有效的源目录，复制内容
+            if [ -d "$SOURCE_DIR" ] && [ "$SOURCE_DIR" != "downloads_temp" ]; then
+              echo "使用最内层目录: $SOURCE_DIR"
+              cp -r "$SOURCE_DIR"/* downloads/ 2>/dev/null || true
+            elif [ -d "downloads_temp/downloads" ]; then
+              # 兼容单层嵌套
+              echo "发现单层嵌套的downloads目录，展开..."
               cp -r downloads_temp/downloads/* downloads/ 2>/dev/null || true
             else
               # 否则直接复制所有内容
