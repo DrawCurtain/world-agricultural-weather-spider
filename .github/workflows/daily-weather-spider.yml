@@ -29,10 +29,11 @@ jobs:
         run: sudo timedatectl set-timezone Asia/Shanghai
 
       - name: Restore downloads cache
+        id: restore-cache
         uses: actions/cache@v4
         with:
           path: downloads/
-          key: weather-downloads-${{ github.run_id }}
+          key: weather-downloads-${{ github.run_number }}
           restore-keys: |
             weather-downloads-
 
@@ -46,8 +47,7 @@ jobs:
         if: always()
         with:
           path: downloads/
-          key: weather-downloads-${{ github.run_id }}
-          # 只保留最近几天的缓存，避免存储成本过高
+          key: weather-downloads-${{ github.run_number }}
           enableCrossOsArchive: true
 
       - name: Upload output images
