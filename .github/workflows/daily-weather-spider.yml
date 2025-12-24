@@ -149,6 +149,62 @@ jobs:
 
       continue-on-error: false
 
+    - name: Verify downloads data
+      id: verify-downloads
+      run: |
+        # 验证downloads目录的数据完整性
+        echo "=== 验证下载数据 ===" > downloads_verification.log
+
+        # 检查pcp数据
+        if [ -d "downloads/pcp" ]; then
+          pcp_days=$(find downloads/pcp -mindepth 1 -maxdepth 1 -type d | wc -l)
+          pcp_files=$(find downloads/pcp -mindepth 2 -name "*.png" | wc -l)
+          echo "降水数据天数: $pcp_days" >> downloads_verification.log
+          echo "降水数据文件数: $pcp_files" >> downloads_verification.log
+
+          # 列出最新的5个日期
+          latest_pcp=$(find downloads/pcp -mindepth 1 -maxdepth 1 -type d | sort | tail -5 | tr '\n' ' ')
+          echo "最新降水数据日期: $latest_pcp" >> downloads_verification.log
+
+          # 验证数据完整性（每天应该有18个文件）
+          expected_files=$((pcp_days * 18))
+          if [ "$pcp_files" -eq "$expected_files" ]; then
+            echo "✅ 降水数据完整" >> downloads_verification.log
+          else
+            echo "⚠️ 降水数据不完整 (预期: $expected_files, 实际: $pcp_files)" >> downloads_verification.log
+          fi
+        else
+          echo "❌ 未找到降水数据目录" >> downloads_verification.log
+        fi
+
+        # 检查tmp数据
+        if [ -d "downloads/tmp" ]; then
+          tmp_days=$(find downloads/tmp -mindepth 1 -maxdepth 1 -type d | wc -l)
+          tmp_files=$(find downloads/tmp -mindepth 2 -name "*.png" | wc -l)
+          echo "温度数据天数: $tmp_days" >> downloads_verification.log
+          echo "温度数据文件数: $tmp_files" >> downloads_verification.log
+
+          # 列出最新的5个日期
+          latest_tmp=$(find downloads/tmp -mindepth 1 -maxdepth 1 -type d | sort | tail -5 | tr '\n' ' ')
+          echo "最新温度数据日期: $latest_tmp" >> downloads_verification.log
+
+          # 验证数据完整性
+          expected_files=$((tmp_days * 18))
+          if [ "$tmp_files" -eq "$expected_files" ]; then
+            echo "✅ 温度数据完整" >> downloads_verification.log
+          else
+            echo "⚠️ 温度数据不完整 (预期: $expected_files, 实际: $tmp_files)" >> downloads_verification.log
+          fi
+        else
+          echo "❌ 未找到温度数据目录" >> downloads_verification.log
+        fi
+
+        # 显示验证结果
+        cat downloads_verification.log
+
+        # 将验证结果写入文件，供artifact上传
+        cp downloads_verification.log ./
+
     - name: Check if outputs exist
       id: check-outputs
       run: |
@@ -199,7 +255,9 @@ jobs:
       with:
         # 使用固定的artifact名称，确保每次都能找到之前的数据
         name: weather-downloads
-        path: downloads/
+        path: |
+          downloads/
+          downloads_verification.log
         retention-days: 90  # 保留90天，确保数据持久性
 
     # 注意：Create release 步骤已移除，因为它需要额外的权限
