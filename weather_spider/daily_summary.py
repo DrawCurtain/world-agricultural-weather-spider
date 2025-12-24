@@ -6,31 +6,37 @@ from .parser import WeatherParser
 from .image_generator import create_image_comparison
 from .config import config
 
-def log(message):
-    """将日志信息写入文件"""
+# 缓存状态（从环境变量获取）
+CACHE_STATUS = os.getenv('GITHUB_CACHE_STATUS', 'unknown')
+
+def log(message, level="INFO"):
+    """将日志信息写入文件并输出到控制台
+
+    Args:
+        message: 日志消息
+        level: 日志级别 (INFO, WARN, ERROR, SUCCESS)
+    """
     log_file = config.log_file
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    # 在GitHub Actions模式下，对所有特殊字符进行转义以避免被误解为命令
-    if config.mode == 'github_actions':
-        # 转义所有可能导致GitHub Actions误解的字符
-        message = message.replace('output/', '[output]_path_')
-        message = message.replace('downloads/', '[downloads]_path_')
-        # 转义冒号（使用全角冒号代替）
-        message = message.replace(':', '：')
-        # 转义其他可能的特殊字符
-        message = message.replace('|', '\\|')
-        message = message.replace('::', '：：')
+    # 日志级别标记
+    level_markers = {
+        "INFO": "[INFO]",
+        "WARN": "[WARN]",
+        "ERROR": "[ERROR]",
+        "SUCCESS": "[SUCCESS]",
+    }
+    marker = level_markers.get(level, "[INFO]")
 
-    # 使用短横线分隔符写入日志
+    # 格式化日志
+    formatted_msg = f"{marker} {message}"
+
+    # 写入日志文件
     with open(log_file, "a", encoding="utf-8") as f:
-        f.write(f"{timestamp} - {message}\n")
+        f.write(f"{timestamp} {formatted_msg}\n")
 
-    # 在GitHub Actions环境中，完全禁用stdout输出以防止GitHub Actions解析错误
-    # 仅在非GitHub Actions环境或调试模式下输出到控制台
-    if config.mode != 'github_actions':
-        print(message)
-    # 在GitHub Actions模式下，什么都不做（禁用所有输出）
+    # 输出到控制台
+    print(formatted_msg)
 
 class DailyWeatherSummary:
     """每日天气数据汇总模块，用于生成今天和前一天的天气对比Word文档"""
@@ -64,73 +70,87 @@ class DailyWeatherSummary:
         # 创建输出目录
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
-            log(f"创建输出目录: {self.output_dir}")
 
-        log(f"时区设置: {config.timezone}")
-        log(f"运行模式: {config.mode}")
-        log(f"当前时间: {now.strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    def download_weather_data(self, date_str):
-        """下载指定日期的天气数据
-        
-        Args:
-            date_str: 日期字符串，格式为"YYYYMMDD"
-        """
-        log(f"=== 开始下载{date_str}的天气数据 ===")
-        
-        # 下载大豆降水预报数据
-        log(f"\n下载大豆降水预报数据...")
-        self.downloader.download_weather_images(date_str, "pcp", "soybeans")
-        
-        # 下载大豆温度预报数据
-        log(f"\n下载大豆温度预报数据...")
-        self.downloader.download_weather_images(date_str, "tmp", "soybeans")
+        # 打印启动信息
+        log("=" * 50)
+        log(f"启动时间: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+        log(f"对比日期: {self.compare_dates['previous']} vs {self.compare_dates['current']}")
+        log(f"保存目录: {self.output_dir}")
+
+        # 检查并打印缓存状态
+        self._check_cache_status()
+
+    def _check_cache_status(self):
+        """检查缓存状态并打印"""
+        previous_pcp_path = os.path.join("downloads", "pcp", self.compare_dates['previous'])
+        previous_tmp_path = os.path.join("downloads", "tmp", self.compare_dates['previous'])
+        current_pcp_path = os.path.join("downloads", "pcp", self.compare_dates['current'])
+        current_tmp_path = os.path.join("downloads", "tmp", self.compare_dates['current'])
+
+        # 检查前一天数据
+        pcp_prev_exists = os.path.exists(previous_pcp_path)
+        tmp_prev_exists = os.path.exists(previous_tmp_path)
+
+        if pcp_prev_exists and tmp_prev_exists:
+            pcp_count = len(os.listdir(previous_pcp_path)) if pcp_prev_exists else 0
+            tmp_count = len(os.listdir(previous_tmp_path)) if tmp_prev_exists else 0
+            log(f"缓存状态: 前一天数据存在 (pcp:{pcp_count}张, tmp:{tmp_count}张)", "SUCCESS")
+        else:
+            log(f"缓存状态: 前一天数据不存在 (首次运行)", "WARN")
+
+        # 检查当天数据
+        pcp_curr_exists = os.path.exists(current_pcp_path)
+        tmp_curr_exists = os.path.exists(current_tmp_path)
+
+        if pcp_curr_exists or tmp_curr_exists:
+            pcp_count = len(os.listdir(current_pcp_path)) if pcp_curr_exists else 0
+            tmp_count = len(os.listdir(current_tmp_path)) if tmp_curr_exists else 0
+            log(f"缓存状态: 当天数据已存在 (pcp:{pcp_count}张, tmp:{tmp_count}张)", "INFO")
 
     def process_weather_data(self, weather_type):
         """处理指定类型的天气数据"""
         # 查找需要对比的图片对
         image_pairs = self.find_image_pairs(weather_type)
-        
+
         if not image_pairs:
-            log(f"未找到{weather_type}数据的对比图片")
             return
-        
+
         # 为美国创建对比文档
         self.create_comparison_document(weather_type, image_pairs, "usa")
-        
+
         # 为巴西创建对比文档
         self.create_comparison_document(weather_type, image_pairs, "brazil")
-        
+
         # 为阿根廷创建对比文档
         self.create_comparison_document(weather_type, image_pairs, "argentina")
-        
+
         # 为其他国家创建对比文档
         self.create_comparison_document(weather_type, image_pairs, "others")
-        
+
         # 为所有国家创建对比文档
         self.create_comparison_document(weather_type, image_pairs, "all")
 
     def find_image_pairs(self, weather_type):
         """查找需要对比的图片对"""
         pairs = []
-        
+
         # 构建两天的图片路径（使用项目相对路径）
         previous_path = os.path.join("downloads", weather_type, self.compare_dates['previous'])
         current_path = os.path.join("downloads", weather_type, self.compare_dates['current'])
-        
+
         # 检查路径是否存在
         if not os.path.exists(previous_path):
-            log(f"前一天图片路径不存在: {previous_path}")
-            previous_path = current_path  # 如果前一天路径不存在，使用当前日期路径
-        
+            log(f"前一天路径不存在，将使用当天路径", "WARN")
+            previous_path = current_path
+
         if not os.path.exists(current_path):
-            log(f"当前图片路径不存在: {current_path}")
+            log(f"当天路径不存在: {current_path}", "ERROR")
             return pairs
-        
+
         # 获取两天的图片文件列表
-        previous_files = os.listdir(previous_path)
+        previous_files = os.listdir(previous_path) if os.path.exists(previous_path) else []
         current_files = os.listdir(current_path)
-        
+
         # 查找匹配的图片对
         for prev_file in previous_files:
             if prev_file in current_files:
@@ -140,7 +160,7 @@ class DailyWeatherSummary:
                     "filename": prev_file
                 }
                 pairs.append(pair)
-        
+
         return pairs
 
     def create_comparison_document(self, vrbl, image_pairs, group_type="all"):
@@ -154,11 +174,6 @@ class DailyWeatherSummary:
         Returns:
             str: 生成的图片路径
         """
-        log("\n=== 创建对比图片 ===")
-        log(f"天气变量: {vrbl}")
-        log(f"分组类型: {group_type}")
-        log(f"总图片对数量: {len(image_pairs)}")
-
         # 筛选图片对
         filtered_pairs = []
         for pair in image_pairs:
@@ -185,10 +200,7 @@ class DailyWeatherSummary:
                 elif group_type == "all":
                     filtered_pairs.append((today_path, yesterday_path, region, subregion))
 
-        log(f"筛选后图片对数量: {len(filtered_pairs)}")
-
         if not filtered_pairs:
-            log(f"没有找到{group_type}的图片对")
             return None
 
         # 生成图片文件路径
@@ -218,19 +230,18 @@ class DailyWeatherSummary:
                 compare_dates=self.compare_dates,
                 save_date_str=self.save_date_str
             )
-            log(f"成功生成对比图片: {img_path}")
+            # 简化日志，只显示文件名
+            filename = os.path.basename(img_path)
+            log(f"生成: {filename} ({len(filtered_pairs)}个地区)", "SUCCESS")
             return img_path
         except Exception as e:
-            log(f"生成对比图片失败: {e}")
+            log(f"生成失败 {group_desc}: {e}", "ERROR")
             return None
 
-  
+
     def run(self):
         """运行每日天气总结的主要流程"""
-        log(f"\n=== 开始每日天气总结流程 ===")
-        log(f"当前时间: {datetime.datetime.now()}")
-        log(f"比较日期: {self.compare_dates['previous']} vs {self.compare_dates['current']}")
-        log(f"保存目录: {self.output_dir}")
+        log("开始下载天气数据...")
 
         # 大豆的crop_index是1
         soybean_crop_index = 1
@@ -241,6 +252,7 @@ class DailyWeatherSummary:
         target_date = self.compare_dates['current']
 
         # 下载降水数据
+        log("[1/2] 下载降水数据 (pcp)...")
         self.downloader.download_all_images_by_crop(
             crop_index=soybean_crop_index,
             vrbl="pcp",
@@ -249,6 +261,7 @@ class DailyWeatherSummary:
         )
 
         # 下载温度数据
+        log("[2/2] 下载温度数据 (tmp)...")
         self.downloader.download_all_images_by_crop(
             crop_index=soybean_crop_index,
             vrbl="tmp",
@@ -256,15 +269,18 @@ class DailyWeatherSummary:
             date_str=target_date
         )
 
-        log(f"\n图片下载完成")
+        log("数据下载完成", "SUCCESS")
 
         # 处理降水数据
+        log("生成降水对比图片...")
         self.process_weather_data("pcp")
 
         # 处理温度数据
+        log("生成温度对比图片...")
         self.process_weather_data("tmp")
 
-        log(f"\n=== 每日天气总结流程完成 ===")
+        log("=" * 50)
+        log("任务完成!", "SUCCESS")
 
 
 def main():
