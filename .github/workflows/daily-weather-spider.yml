@@ -86,7 +86,17 @@ jobs:
           # 如果downloads_temp下有文件，移动到downloads
           if [ -n "$(ls -A downloads_temp/ 2>/dev/null)" ]; then
             echo "正在合并历史数据到downloads目录..."
-            cp -r downloads_temp/* downloads/ 2>/dev/null || true
+
+            # 检查是否包含downloads目录本身
+            if [ -d "downloads_temp/downloads" ]; then
+              # 如果downloads_temp下有downloads目录，直接使用它
+              echo "发现嵌套的downloads目录，展开..."
+              cp -r downloads_temp/downloads/* downloads/ 2>/dev/null || true
+            else
+              # 否则直接复制所有内容
+              cp -r downloads_temp/* downloads/ 2>/dev/null || true
+            fi
+
             rm -rf downloads_temp
             echo "历史数据合并完成"
           fi
