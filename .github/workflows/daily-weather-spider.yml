@@ -141,11 +141,20 @@ jobs:
         export WEATHER_SPIDER_MODE="github_actions"
         export WEATHER_SPIDER_TIMEZONE="Asia/Shanghai"
 
-        # 禁用Shell回显，避免显示命令执行过程
-        set +x
+        # 运行前检查数据状态
+        echo "=== 运行前数据状态 ===" > execution.log
+        echo "降水数据天数: $(find downloads/pcp -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)" >> execution.log
+        echo "温度数据天数: $(find downloads/tmp -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)" >> execution.log
+        echo "" >> execution.log
 
-        # 运行脚本：将所有输出重定向到文件，避免GitHub Actions解析错误
-        python -u run_weather_spider.py > execution.log 2>&1
+        # 运行脚本：将所有输出重定向到文件
+        python -u run_weather_spider.py >> execution.log 2>&1
+
+        # 运行后检查数据状态
+        echo "" >> execution.log
+        echo "=== 运行后数据状态 ===" >> execution.log
+        echo "降水数据天数: $(find downloads/pcp -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)" >> execution.log
+        echo "温度数据天数: $(find downloads/tmp -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)" >> execution.log
 
       continue-on-error: false
 
