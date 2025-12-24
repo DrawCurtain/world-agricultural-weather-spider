@@ -70,35 +70,12 @@ class WeatherSpiderConfig:
 
     def get_cutoff_time(self, current_time: datetime.datetime) -> datetime.datetime:
         """获取截止时间（北京时间19:30）"""
-        # 确保 current_time 是带时区的 datetime
-        if current_time.tzinfo is None and self.timezone:
-            # 如果 current_time 没有时区信息，添加时区
-            if HAS_ZONEINFO is True:
-                current_time = current_time.replace(tzinfo=self.timezone)
-            elif HAS_ZONEINFO is False:
-                current_time = self.timezone.localize(current_time)
-
-        # 创建截止时间（保留时区信息）
-        if current_time.tzinfo:
-            # 如果有时区信息，在该时区中设置19:30
-            cutoff_naive = current_time.replace(hour=19, minute=30, second=0, microsecond=0)
-            # 确保在正确的时区
-            if cutoff_naive.tzinfo != current_time.tzinfo:
-                cutoff_naive = cutoff_naive.replace(tzinfo=current_time.tzinfo)
-            return cutoff_naive
-        else:
-            # 如果没有时区信息，使用本地时间
-            return current_time.replace(hour=19, minute=30, second=0, microsecond=0)
+        # 简化逻辑：直接替换时间
+        return current_time.replace(hour=19, minute=30, second=0, microsecond=0)
 
     def should_download_previous_day(self, current_time: datetime.datetime) -> bool:
         """判断是否应该下载前一天的数据（19:30前）"""
-        # 确保 current_time 包含时区信息
-        if current_time.tzinfo is None and self.timezone:
-            if HAS_ZONEINFO is True:
-                current_time = current_time.replace(tzinfo=self.timezone)
-            elif HAS_ZONEINFO is False:
-                current_time = self.timezone.localize(current_time)
-
+        # 简化逻辑：直接比较时间
         cutoff_time = self.get_cutoff_time(current_time)
         return current_time < cutoff_time
 
