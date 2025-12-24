@@ -42,10 +42,37 @@ jobs:
           ${{ runner.os }}-pip-
 
     - name: Restore weather data downloads
-      uses: actions/download-artifact@v4
-      with:
-        name: weather-downloads-latest
-        path: downloads
+      run: |
+        # 下载最近几次运行的weather-downloads artifact
+        # 尝试下载最近几次运行的artifact
+        echo "正在查找并下载最近的weather-downloads artifact..."
+
+        # 获取最近的workflow运行列表
+        run_list=$(gh run list --workflow=daily-weather-spider.yml --limit 10 --json databaseId --jq '.[].databaseId')
+
+        # 尝试下载最近几次运行的artifact
+        for run_id in $run_list; do
+          echo "尝试下载run #$run_id 的artifact..."
+          gh run download "$run_id" --name "weather-downloads-*" --dir downloads_temp/ 2>/dev/null && echo "成功下载run #$run_id" && break || echo "run #$run_id 没有weather-downloads artifact"
+        done
+
+        # 将下载的内容移动到downloads目录
+        if [ -d "downloads_temp" ]; then
+          # 如果downloads_temp下有文件，移动到downloads
+          if [ -n "$(ls -A downloads_temp/ 2>/dev/null)" ]; then
+            mv downloads_temp/* downloads/ 2>/dev/null || true
+          fi
+          rm -rf downloads_temp
+        fi
+
+        # 确保必要的目录存在
+        mkdir -p downloads/pcp downloads/tmp
+
+        # 显示downloads目录的内容
+        echo "下载完成，当前downloads目录结构："
+        find downloads -type d -maxdepth 2 2>/dev/null || true
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       continue-on-error: true
 
     - name: Install dependencies
@@ -63,14 +90,13 @@ jobs:
 
     - name: Clean up old files
       run: |
-        # 设置保留天数（可通过环境变量自定义）
-        RETENTION_DAYS=${RETENTION_DAYS:-7}
+        # 暂时禁用清理，先观察数据累积情况
+        echo "清理已禁用，保留所有历史数据"
+        # RETENTION_DAYS=${RETENTION_DAYS:-90}
+        # chmod +x .github/cleanup-config.sh
+        # .github/cleanup-config.sh
 
-        # 使用清理脚本
-        chmod +x .github/cleanup-config.sh
-        .github/cleanup-config.sh
-
-        # 清理后的空间使用情况已保存到文件，避免在GitHub Actions输出中显示
+        # 记录当前空间使用情况
         du -sh downloads output > disk_usage.log 2>/dev/null || true
 
     - name: Set environment variables for network
@@ -141,9 +167,10 @@ jobs:
     - name: Upload weather downloads
       uses: actions/upload-artifact@v4
       with:
-        name: weather-downloads-latest
+        # 使用带日期的artifact名称，避免覆盖历史数据
+        name: weather-downloads-${{ github.run_number }}
         path: downloads/
-        retention-days: 7
+        retention-days: 30
 
     # 注意：Create release 步骤已移除，因为它需要额外的权限
     # 所有输出文件已通过 artifacts 上传，无需额外创建 release

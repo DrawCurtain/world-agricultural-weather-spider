@@ -232,9 +232,6 @@ class DailyWeatherSummary:
         log(f"比较日期: {self.compare_dates['previous']} vs {self.compare_dates['current']}")
         log(f"保存目录: {self.output_dir}")
 
-        # 下载当天和前一天的大豆降水预报图片
-        log(f"\n开始下载大豆降水预报图片...")
-
         # 大豆的crop_index是1
         soybean_crop_index = 1
         # 默认使用15天预报
