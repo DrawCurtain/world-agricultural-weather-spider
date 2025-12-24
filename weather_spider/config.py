@@ -55,18 +55,10 @@ class WeatherSpiderConfig:
             print(f"警告：未找到时区库，使用系统本地时间")
 
     def get_current_time(self) -> datetime.datetime:
-        """获取当前时间（考虑时区）"""
-        if self.timezone:
-            # 如果有时区信息，返回带时区的时间
-            if HAS_ZONEINFO is True:
-                # 使用 zoneinfo
-                return datetime.datetime.now(self.timezone)
-            elif HAS_ZONEINFO is False:
-                # 使用 pytz
-                return datetime.datetime.now(self.timezone)
-        else:
-            # 如果没有时区库，返回系统本地时间
-            return datetime.datetime.now()
+        """获取当前时间"""
+        # 直接返回系统本地时间，简化逻辑
+        # GitHub Actions 已设置 TZ 环境变量，Python 会正确处理
+        return datetime.datetime.now()
 
     def get_cutoff_time(self, current_time: datetime.datetime) -> datetime.datetime:
         """获取截止时间（北京时间19:30）"""
