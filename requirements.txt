@@ -2,3 +2,4 @@ requests
 pyinstaller
 Pillow>=9.0.0
 retrying
+pytz

@@ -156,25 +156,49 @@ class ImageDownloader:
     
     def download_all_images(self, vrbl, nday=15):
         """下载所有作物、所有国家和地区的图片
-        
+
         Args:
             vrbl: 天气变量（"pcp"表示降水，"tmp"表示温度）
             nday: 天数（15, 60, 180），默认是15
-        
+
         Returns:
             dict: 下载结果，键为图片保存路径，值为布尔值表示下载是否成功
         """
         results = {}
-        
+
         # 获取所有作物
         crops = self.parser.get_supported_crops()
-        
+
         for crop_index in range(len(crops)):
             print(f"\n=== 正在下载{vrbl}数据: {crops[crop_index]} ===")
             crop_results = self.download_all_images_by_crop(crop_index, vrbl, nday)
             results.update(crop_results)
-        
+
         return results
+
+    def download_weather_images(self, date_str, vrbl, crop_name, nday=15):
+        """下载指定作物的所有国家和地区的图片（字符串版本）
+
+        Args:
+            date_str: 日期字符串（格式：YYYYMMDD）
+            vrbl: 天气变量（"pcp"表示降水，"tmp"表示温度）
+            crop_name: 作物名称字符串（如"soybeans"）
+            nday: 天数（15, 60, 180），默认是15
+
+        Returns:
+            dict: 下载结果，键为图片保存路径，值为布尔值表示下载是否成功
+        """
+        # 将作物名称字符串转换为索引
+        crops = self.parser.get_supported_crops()
+        try:
+            crop_index = crops.index(crop_name)
+        except ValueError:
+            print(f"不支持的作物: {crop_name}")
+            print(f"支持的作物: {crops}")
+            return {}
+
+        print(f"\n=== 开始下载{crop_name}的{vrbl}数据 ({date_str}) ===")
+        return self.download_all_images_by_crop(crop_index, vrbl, nday, date_str)
 
 # 测试代码
 if __name__ == '__main__':

@@ -43,34 +43,64 @@ jobs:
 
     - name: Restore weather data downloads
       run: |
-        # 下载最近几次运行的weather-downloads artifact
-        # 尝试下载最近几次运行的artifact
+        # 下载固定名称的weather-downloads artifact
+        # 使用固定名称确保每次都能找到之前的数据
         echo "正在查找并下载最近的weather-downloads artifact..."
 
-        # 获取最近的workflow运行列表
-        run_list=$(gh run list --workflow=daily-weather-spider.yml --limit 10 --json databaseId --jq '.[].databaseId')
+        # 获取最近的workflow运行列表（尝试最近5次）
+        run_list=$(gh run list --workflow=daily-weather-spider.yml --limit 5 --json databaseId --jq '.[].databaseId')
 
-        # 尝试下载最近几次运行的artifact
+        # 尝试从最近几次运行中下载固定的artifact名称
         for run_id in $run_list; do
-          echo "尝试下载run #$run_id 的artifact..."
-          gh run download "$run_id" --name "weather-downloads-*" --dir downloads_temp/ 2>/dev/null && echo "成功下载run #$run_id" && break || echo "run #$run_id 没有weather-downloads artifact"
+          echo "尝试下载run #$run_id 的weather-downloads artifact..."
+          gh run download "$run_id" --name "weather-downloads" --dir downloads_temp/ 2>/dev/null && echo "成功下载run #$run_id 的数据" && break || echo "run #$run_id 没有weather-downloads artifact"
         done
 
         # 将下载的内容移动到downloads目录
         if [ -d "downloads_temp" ]; then
           # 如果downloads_temp下有文件，移动到downloads
           if [ -n "$(ls -A downloads_temp/ 2>/dev/null)" ]; then
-            mv downloads_temp/* downloads/ 2>/dev/null || true
+            echo "正在合并历史数据到downloads目录..."
+            cp -r downloads_temp/* downloads/ 2>/dev/null || true
+            rm -rf downloads_temp
+            echo "历史数据合并完成"
           fi
-          rm -rf downloads_temp
+        else
+          echo "未找到历史数据，将从头开始下载"
         fi
 
         # 确保必要的目录存在
         mkdir -p downloads/pcp downloads/tmp
 
         # 显示downloads目录的内容
-        echo "下载完成，当前downloads目录结构："
+        echo "数据恢复完成，当前downloads目录结构："
         find downloads -type d -maxdepth 2 2>/dev/null || true
+
+        # 统计已有数据的天数
+        if [ -d "downloads/pcp" ]; then
+          pcp_days=$(find downloads/pcp -mindepth 1 -maxdepth 1 -type d | wc -l)
+          echo "已有降水数据天数: $pcp_days"
+          # 列出最新的3个日期
+          latest_pcp=$(find downloads/pcp -mindepth 1 -maxdepth 1 -type d | sort | tail -3 | tr '\n' ' ')
+          echo "最新降水数据日期: $latest_pcp"
+        fi
+        if [ -d "downloads/tmp" ]; then
+          tmp_days=$(find downloads/tmp -mindepth 1 -maxdepth 1 -type d | wc -l)
+          echo "已有温度数据天数: $tmp_days"
+          # 列出最新的3个日期
+          latest_tmp=$(find downloads/tmp -mindepth 1 -maxdepth 1 -type d | sort | tail -3 | tr '\n' ' ')
+          echo "最新温度数据日期: $latest_tmp"
+        fi
+
+        # 验证数据累积情况
+        echo "=== 数据累积验证 ==="
+        if [ "$pcp_days" -gt 1 ]; then
+          echo "✅ 数据已正确累积 (降水数据: $pcp_days 天)"
+        elif [ "$pcp_days" -eq 1 ]; then
+          echo "⚠️  首次运行或数据有限 (降水数据: $pcp_days 天)"
+        else
+          echo "❌ 未找到降水数据"
+        fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       continue-on-error: true
@@ -167,10 +197,10 @@ jobs:
     - name: Upload weather downloads
       uses: actions/upload-artifact@v4
       with:
-        # 使用带日期的artifact名称，避免覆盖历史数据
-        name: weather-downloads-${{ github.run_number }}
+        # 使用固定的artifact名称，确保每次都能找到之前的数据
+        name: weather-downloads
         path: downloads/
-        retention-days: 30
+        retention-days: 90  # 保留90天，确保数据持久性
 
     # 注意：Create release 步骤已移除，因为它需要额外的权限
     # 所有输出文件已通过 artifacts 上传，无需额外创建 release
