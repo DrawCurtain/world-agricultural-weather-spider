@@ -5,6 +5,12 @@ on:
     # 每天北京时间晚上7:30运行 (UTC时间 11:30)
     - cron: '30 11 * * *'
   workflow_dispatch: # 允许手动触发
+    inputs:
+      force_reset:
+        description: 'Force reset - ignore all historical data and start fresh'
+        required: false
+        default: 'false'
+        type: boolean
 
 env:
   PYTHONUNBUFFERED: '1'
@@ -50,11 +56,30 @@ jobs:
         # 获取最近的workflow运行列表（尝试最近5次）
         run_list=$(gh run list --workflow=daily-weather-spider.yml --limit 5 --json databaseId --jq '.[].databaseId')
 
-        # 尝试从最近几次运行中下载固定的artifact名称
+        # 尝试从最近几次运行中下载 artifact（支持多种名称格式）
+        DOWNLOADED=false
         for run_id in $run_list; do
-          echo "尝试下载run #$run_id 的weather-downloads artifact..."
-          gh run download "$run_id" --name "weather-downloads" --dir downloads_temp/ 2>/dev/null && echo "成功下载run #$run_id 的数据" && break || echo "run #$run_id 没有weather-downloads artifact"
+          # 先尝试固定名称
+          if gh run download "$run_id" --name "weather-downloads" --dir downloads_temp/ 2>/dev/null; then
+            echo "✅ 成功下载run #$run_id 的固定名称artifact"
+            DOWNLOADED=true
+            break
+          fi
+
+          # 再尝试带 run_number 的名称
+          for pattern in "weather-downloads-$run_id" "weather-downloads-*" "downloads"; do
+            if gh run download "$run_id" --name "$pattern" --dir downloads_temp/ 2>/dev/null; then
+              echo "✅ 成功下载run #$run_id 的artifact (名称匹配: $pattern)"
+              DOWNLOADED=true
+              break 2
+            fi
+          done
+          echo "run #$run_id 没有找到可下载的artifact"
         done
+
+        if [ "$DOWNLOADED" = false ]; then
+          echo "⚠️ 未找到任何历史数据，将从头开始下载"
+        fi
 
         # 将下载的内容移动到downloads目录
         if [ -d "downloads_temp" ]; then
@@ -210,9 +235,6 @@ jobs:
 
         # 显示验证结果
         cat downloads_verification.log
-
-        # 将验证结果写入文件，供artifact上传
-        cp downloads_verification.log ./
 
     - name: Check if outputs exist
       id: check-outputs
