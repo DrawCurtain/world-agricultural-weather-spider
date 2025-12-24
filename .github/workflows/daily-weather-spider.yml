@@ -2,304 +2,66 @@ name: Daily Weather Spider
 
 on:
   schedule:
-    # 每天北京时间晚上7:30运行 (UTC时间 11:30)
+    # 每天 UTC 11:30 (北京时间 19:30) 运行
     - cron: '30 11 * * *'
-  workflow_dispatch: # 允许手动触发
-    inputs:
-      force_reset:
-        description: 'Force reset - ignore all historical data and start fresh'
-        required: false
-        default: 'false'
-        type: boolean
-
-env:
-  PYTHONUNBUFFERED: '1'
-  TZ: 'Asia/Shanghai'  # 设置时区为北京时间
-  # 禁用GitHub Actions调试输出，避免特殊字符被误解为命令
-  ACTIONS_STEP_DEBUG: false
-  ACTIONS_RUNNER_DEBUG: false
-  # 禁用GitHub Actions命令处理，避免路径被误解为命令
-  ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
-  run-weather-spider:
+  weather-spider:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set timezone
-      run: |
-        sudo timedatectl set-timezone Asia/Shanghai
-        date
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+      - name: Set timezone
+        run: sudo timedatectl set-timezone Asia/Shanghai
 
-    - name: Restore weather data downloads
-      run: |
-        # 下载固定名称的weather-downloads artifact
-        # 使用固定名称确保每次都能找到之前的数据
-        echo "正在查找并下载最近的weather-downloads artifact..."
+      - name: Restore downloads cache
+        uses: actions/cache@v4
+        with:
+          path: downloads/
+          key: weather-downloads-${{ github.run_id }}
+          restore-keys: |
+            weather-downloads-
 
-        # 获取最近的workflow运行列表（尝试最近5次）
-        run_list=$(gh run list --workflow=daily-weather-spider.yml --limit 5 --json databaseId --jq '.[].databaseId')
+      - name: Run weather spider
+        env:
+          TZ: Asia/Shanghai
+        run: python -m weather_spider
 
-        # 尝试从最近几次运行中下载 artifact（支持多种名称格式）
-        DOWNLOADED=false
-        for run_id in $run_list; do
-          # 先尝试固定名称
-          if gh run download "$run_id" --name "weather-downloads" --dir downloads_temp/ 2>/dev/null; then
-            echo "✅ 成功下载run #$run_id 的固定名称artifact"
-            DOWNLOADED=true
-            break
-          fi
+      - name: Save downloads cache
+        uses: actions/cache@v4
+        if: always()
+        with:
+          path: downloads/
+          key: weather-downloads-${{ github.run_id }}
+          # 只保留最近几天的缓存，避免存储成本过高
+          enableCrossOsArchive: true
 
-          # 再尝试带 run_number 的名称
-          for pattern in "weather-downloads-$run_id" "weather-downloads-*" "downloads"; do
-            if gh run download "$run_id" --name "$pattern" --dir downloads_temp/ 2>/dev/null; then
-              echo "✅ 成功下载run #$run_id 的artifact (名称匹配: $pattern)"
-              DOWNLOADED=true
-              break 2
-            fi
-          done
-          echo "run #$run_id 没有找到可下载的artifact"
-        done
+      - name: Upload output images
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-output-${{ github.run_number }}
+          path: output/
+          retention-days: 30
 
-        if [ "$DOWNLOADED" = false ]; then
-          echo "⚠️ 未找到任何历史数据，将从头开始下载"
-        fi
-
-        # 将下载的内容移动到downloads目录
-        if [ -d "downloads_temp" ]; then
-          # 如果downloads_temp下有文件，移动到downloads
-          if [ -n "$(ls -A downloads_temp/ 2>/dev/null)" ]; then
-            echo "正在合并历史数据到downloads目录..."
-
-            # 处理嵌套的downloads目录
-            if [ -d "downloads_temp/downloads" ]; then
-              # 如果downloads_temp下有downloads目录，直接使用它
-              echo "发现downloads目录，展开..."
-              cp -r downloads_temp/downloads/* downloads/ 2>/dev/null || true
-            else
-              # 否则直接复制所有内容
-              cp -r downloads_temp/* downloads/ 2>/dev/null || true
-            fi
-
-            rm -rf downloads_temp
-            echo "历史数据合并完成"
-          fi
-        else
-          echo "未找到历史数据，将从头开始下载"
-        fi
-
-        # 确保必要的目录存在
-        mkdir -p downloads/pcp downloads/tmp
-
-        # 显示downloads目录的内容
-        echo "数据恢复完成，当前downloads目录结构："
-        find downloads -type d -maxdepth 2 2>/dev/null || true
-
-        # 统计已有数据的天数
-        if [ -d "downloads/pcp" ]; then
-          pcp_days=$(find downloads/pcp -mindepth 1 -maxdepth 1 -type d | wc -l)
-          echo "已有降水数据天数: $pcp_days"
-          # 列出最新的3个日期
-          latest_pcp=$(find downloads/pcp -mindepth 1 -maxdepth 1 -type d | sort | tail -3 | tr '\n' ' ')
-          echo "最新降水数据日期: $latest_pcp"
-        fi
-        if [ -d "downloads/tmp" ]; then
-          tmp_days=$(find downloads/tmp -mindepth 1 -maxdepth 1 -type d | wc -l)
-          echo "已有温度数据天数: $tmp_days"
-          # 列出最新的3个日期
-          latest_tmp=$(find downloads/tmp -mindepth 1 -maxdepth 1 -type d | sort | tail -3 | tr '\n' ' ')
-          echo "最新温度数据日期: $latest_tmp"
-        fi
-
-        # 验证数据累积情况
-        echo "=== 数据累积验证 ==="
-        if [ "$pcp_days" -gt 1 ]; then
-          echo "✅ 数据已正确累积 (降水数据: $pcp_days 天)"
-        elif [ "$pcp_days" -eq 1 ]; then
-          echo "⚠️  首次运行或数据有限 (降水数据: $pcp_days 天)"
-        else
-          echo "❌ 未找到降水数据"
-        fi
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      continue-on-error: true
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install retrying  # 添加重试库
-
-    - name: Create necessary directories
-      run: |
-        mkdir -p downloads/pcp
-        mkdir -p downloads/tmp
-        mkdir -p output
-        mkdir -p weather  # 创建weather目录以防代码需要
-
-    - name: Clean up old files
-      run: |
-        # 暂时禁用清理，先观察数据累积情况
-        echo "清理已禁用，保留所有历史数据"
-        # RETENTION_DAYS=${RETENTION_DAYS:-90}
-        # chmod +x .github/cleanup-config.sh
-        # .github/cleanup-config.sh
-
-        # 记录当前空间使用情况
-        du -sh downloads output > disk_usage.log 2>/dev/null || true
-
-    - name: Set environment variables for network
-      run: |
-        echo "REQUEST_TIMEOUT=30" >> $GITHUB_ENV
-        echo "MAX_RETRIES=3" >> $GITHUB_ENV
-        echo "RETRY_DELAY=5" >> $GITHUB_ENV
-
-    - name: Run weather spider
-      run: |
-        # 设置环境变量
-        export WEATHER_SPIDER_MODE="github_actions"
-        export WEATHER_SPIDER_TIMEZONE="Asia/Shanghai"
-
-        # 运行前检查数据状态
-        echo "=== 运行前数据状态 ===" > execution.log
-        echo "降水数据天数: $(find downloads/pcp -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)" >> execution.log
-        echo "温度数据天数: $(find downloads/tmp -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)" >> execution.log
-        echo "" >> execution.log
-
-        # 运行脚本：将所有输出重定向到文件
-        python -u run_weather_spider.py >> execution.log 2>&1
-
-        # 运行后检查数据状态
-        echo "" >> execution.log
-        echo "=== 运行后数据状态 ===" >> execution.log
-        echo "降水数据天数: $(find downloads/pcp -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)" >> execution.log
-        echo "温度数据天数: $(find downloads/tmp -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)" >> execution.log
-
-      continue-on-error: false
-
-    - name: Verify downloads data
-      id: verify-downloads
-      run: |
-        # 验证downloads目录的数据完整性
-        echo "=== 验证下载数据 ===" > downloads_verification.log
-
-        # 检查pcp数据
-        if [ -d "downloads/pcp" ]; then
-          pcp_days=$(find downloads/pcp -mindepth 1 -maxdepth 1 -type d | wc -l)
-          pcp_files=$(find downloads/pcp -mindepth 2 -name "*.png" | wc -l)
-          echo "降水数据天数: $pcp_days" >> downloads_verification.log
-          echo "降水数据文件数: $pcp_files" >> downloads_verification.log
-
-          # 列出最新的5个日期
-          latest_pcp=$(find downloads/pcp -mindepth 1 -maxdepth 1 -type d | sort | tail -5 | tr '\n' ' ')
-          echo "最新降水数据日期: $latest_pcp" >> downloads_verification.log
-
-          # 验证数据完整性（每天应该有18个文件）
-          expected_files=$((pcp_days * 18))
-          if [ "$pcp_files" -eq "$expected_files" ]; then
-            echo "✅ 降水数据完整" >> downloads_verification.log
-          else
-            echo "⚠️ 降水数据不完整 (预期: $expected_files, 实际: $pcp_files)" >> downloads_verification.log
-          fi
-        else
-          echo "❌ 未找到降水数据目录" >> downloads_verification.log
-        fi
-
-        # 检查tmp数据
-        if [ -d "downloads/tmp" ]; then
-          tmp_days=$(find downloads/tmp -mindepth 1 -maxdepth 1 -type d | wc -l)
-          tmp_files=$(find downloads/tmp -mindepth 2 -name "*.png" | wc -l)
-          echo "温度数据天数: $tmp_days" >> downloads_verification.log
-          echo "温度数据文件数: $tmp_files" >> downloads_verification.log
-
-          # 列出最新的5个日期
-          latest_tmp=$(find downloads/tmp -mindepth 1 -maxdepth 1 -type d | sort | tail -5 | tr '\n' ' ')
-          echo "最新温度数据日期: $latest_tmp" >> downloads_verification.log
-
-          # 验证数据完整性
-          expected_files=$((tmp_days * 18))
-          if [ "$tmp_files" -eq "$expected_files" ]; then
-            echo "✅ 温度数据完整" >> downloads_verification.log
-          else
-            echo "⚠️ 温度数据不完整 (预期: $expected_files, 实际: $tmp_files)" >> downloads_verification.log
-          fi
-        else
-          echo "❌ 未找到温度数据目录" >> downloads_verification.log
-        fi
-
-        # 显示验证结果
-        cat downloads_verification.log
-
-    - name: Check if outputs exist
-      id: check-outputs
-      run: |
-        # 初始化输出变量
-        echo "has_outputs=false" >> $GITHUB_OUTPUT
-
-        # 检查output目录是否存在且有内容
-        if [ -d "output" ] && [ "$(ls -A output 2>/dev/null)" ]; then
-          # 排除.gitkeep文件
-          file_count=$(find output -type f ! -name '.gitkeep' 2>/dev/null | wc -l)
-          if [ "$file_count" -gt 0 ]; then
-            echo "has_outputs=true" >> $GITHUB_OUTPUT
-            # 文件计数信息保存到日志，避免在GitHub Actions输出中显示
-            echo "Found $file_count output files" > file_count.log
-          fi
-        fi
-
-    - name: Create summary
-      if: always()
-      run: |
-        echo "## Weather Spider Execution Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- Date: $(date '+%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_STEP_SUMMARY
-        echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ steps.check-outputs.outputs.has_outputs }}" == "true" ]; then
-          echo "- Output files generated: Yes" >> $GITHUB_STEP_SUMMARY
-          echo "- Files have been uploaded as artifacts" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- Output files generated: No" >> $GITHUB_STEP_SUMMARY
-        fi
-
-        # 日志文件将通过artifact上传，不在summary中显示以避免解析错误
-
-    - name: Upload output artifacts
-      uses: actions/upload-artifact@v4
-      if: steps.check-outputs.outputs.has_outputs == 'true'
-      with:
-        name: weather-outputs-${{ github.run_number }}
-        path: |
-          output/
-          debug.log
-          execution.log
-          disk_usage.log
-          file_count.log
-        retention-days: 30
-
-    - name: Upload weather downloads
-      uses: actions/upload-artifact@v4
-      with:
-        # 使用固定的artifact名称，确保每次都能找到之前的数据
-        name: weather-downloads
-        path: |
-          downloads/
-          downloads_verification.log
-        retention-days: 90  # 保留90天，确保数据持久性
-
-    # 注意：Create release 步骤已移除，因为它需要额外的权限
-    # 所有输出文件已通过 artifacts 上传，无需额外创建 release
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-${{ github.run_number }}
+          path: debug.log
+          retention-days: 7

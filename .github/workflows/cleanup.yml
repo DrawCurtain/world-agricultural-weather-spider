@@ -1,0 +1,22 @@
+name: Cleanup Old Artifacts
+
+on:
+  schedule:
+    # 每周日 UTC 0:00 运行
+    - cron: '0 0 * * 0'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # 需要此权限才能删除 artifacts
+
+    steps:
+      - name: Delete old artifacts
+        uses: Mattraks/delete-artifact-action@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          # 删除 30 天前的 artifacts
+          days olds: 30

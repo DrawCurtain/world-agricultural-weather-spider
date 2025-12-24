@@ -1,50 +1,21 @@
-# 全球农业天气数据爬虫
+# World Agricultural Weather Spider
 
-## 项目简介
+全球农业天气数据爬虫，自动采集主要农业产区的降水和温度预报数据，并生成可视化对比图片。
 
-本项目用于爬取全球主要农业地区的天气预报数据（包括降水和温度），生成对比图片供农业分析使用。
+## 功能特性
 
-## 功能特点
+- 支持 5 种主要农作物：玉米、大豆、小麦、油菜籽、大麦
+- 覆盖全球 9 个主要农业产区：美国、巴西、阿根廷、中国、加拿大、欧洲、乌克兰、澳大利亚、印度
+- 自动下载降水（pcp）和温度（tmp）预报图片
+- 生成左右对比的可视化图片（前一天 vs 当天）
+- 支持按国家分组查看：美国、巴西、阿根廷、其他国家、全部
 
-- 自动下载美国、巴西、阿根廷等主要农业地区的天气预报数据
-- 支持降水（pcp）和温度（tmp）两种天气类型
-- 生成前一天和当天的天气对比图片
-- 使用PIL库直接生成高质量图片，无需HTML转换
-- 按地区分类生成对比报告（美国、巴西、阿根廷等）
-- 自动根据时间判断下载当天的数据还是昨天的数据
+## 数据来源
 
-## 项目结构
+- 数据源：全球农业天气预报系统
+- 图片类型：15天降水预报、15天温度预报
 
-```
-world-agricultural-weather-spider/
-├── weather_spider/              # 核心代码目录
-│   ├── __init__.py
-│   ├── daily_summary.py         # 主要流程控制
-│   ├── downloader.py            # 图片下载模块
-│   ├── parser.py                # 数据解析模块
-│   └── image_generator.py       # 图片生成模块
-├── downloads/                   # 下载的原始图片存储目录
-│   ├── pcp/                     # 降水数据
-│   │   ├── 20251218/            # 按日期存储
-│   │   └── 20251217/
-│   └── tmp/                     # 温度数据
-│       ├── 20251218/
-│       └── 20251217/
-├── output/                      # 生成的对比图片存储目录
-│   └── 20251218/                # 按日期存储
-├── bin/                         # 可执行文件目录
-├── requirements.txt             # 项目依赖
-├── setup.py                     # 安装配置
-├── README.md                    # 项目说明
-└── README_EXE.md                # 可执行版本说明
-```
-
-## 安装与使用
-
-### 环境要求
-
-- Python 3.7+
-- 网络连接（用于下载数据）
+## 本地运行
 
 ### 安装依赖
 
@@ -52,92 +23,93 @@ world-agricultural-weather-spider/
 pip install -r requirements.txt
 ```
 
-### 运行方法
-
-#### 方法1：使用Python模块方式运行
+### 运行爬虫
 
 ```bash
-python -m weather_spider.daily_summary
+# 方式1：使用模块方式
+python -m weather_spider
+
+# 方式2：安装后使用命令
+pip install -e .
+weather-spider
 ```
 
-#### 方法2：使用可执行文件（Windows）
+### 环境变量配置
 
-1. 运行 `build_exe.bat` 生成可执行文件
-2. 双击运行 `bin/天气爬虫.exe`
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `WEATHER_SPIDER_TIMEZONE` | `Asia/Shanghai` | 时区设置 |
+| `WEATHER_SPIDER_MODE` | `local` | 运行模式（local/github_actions） |
+| `REQUEST_TIMEOUT` | `30` | 请求超时时间（秒） |
+| `MAX_RETRIES` | `3` | 最大重试次数 |
+| `RETRY_DELAY` | `5` | 重试延迟（秒） |
 
-## 输出说明
+## 项目结构
 
-程序运行后会生成以下对比图片：
+```
+world-agricultural-weather-spider/
+├── run_weather_spider.py          # 主程序入口（用于打包exe）
+├── weather_spider/                 # 核心爬虫模块
+│   ├── __main__.py                # 包的主入口点
+│   ├── config.py                  # 配置管理
+│   ├── daily_summary.py           # 主要业务逻辑
+│   ├── downloader.py              # 图片下载器
+│   ├── parser.py                  # 数据解析器和URL构建
+│   ├── network.py                 # 网络请求模块
+│   └── image_generator.py         # 图片对比生成器
+├── downloads/                      # 下载的原始图片数据
+│   ├── pcp/                       # 降水数据
+│   └── tmp/                       # 温度数据
+├── output/                        # 生成的对比图片输出
+├── requirements.txt               # 依赖包列表
+└── setup.py                       # 项目安装配置
+```
 
-- `weather_summary_pcp_usa_YYYYMMDD.png` - 美国降水预报对比
-- `weather_summary_tmp_usa_YYYYMMDD.png` - 美国温度预报对比
-- `weather_summary_pcp_brazil_YYYYMMDD.png` - 巴西降水预报对比
-- `weather_summary_tmp_brazil_YYYYMMDD.png` - 巴西温度预报对比
-- `weather_summary_pcp_argentina_YYYYMMDD.png` - 阿根廷降水预报对比
-- `weather_summary_tmp_argentina_YYYYMMDD.png` - 阿根廷温度预报对比
+## 数据说明
 
-### 图片布局说明
+### 时间逻辑
 
-生成的对比图片包含：
+- **19:30 前**：下载前一天的数据
+- **19:30 后**：下载当天的数据
 
-1. **主标题**：地区+天气类型对比（如"美国降水预报对比"）
-2. **生成时间**：图片生成的时间戳（右上角）
-3. **日期信息**：当前数据和前一期数据的日期（居中）
-4. **地区标题**：具体地区名称（如"美国 - 爱荷华州 降水预报"）
-5. **对比图片**：前一天（左）和当天（右）的天气预报图
+### 对比图片生成
 
-### 时间规则
+每次运行会生成以下对比图片：
+- `weather_summary_pcp_usa_YYYYMMDD.png` - 美国降水对比
+- `weather_summary_pcp_brazil_YYYYMMDD.png` - 巴西降水对比
+- `weather_summary_pcp_argentina_YYYYMMDD.png` - 阿根廷降水对比
+- `weather_summary_pcp_others_YYYYMMDD.png` - 其他国家降水对比
+- `weather_summary_pcp_YYYYMMDD.png` - 所有国家降水对比
+- `weather_summary_tmp_*.png` - 温度对比（同上结构）
 
-- **19:30前**：下载昨天的数据，保存到昨天的文件夹
-- **19:30后**：下载今天的数据，保存到今天的文件夹
+## GitHub Actions
 
-## 技术实现
+项目配置了 GitHub Actions 自动运行：
 
-### 核心改进
+### 自动运行
 
-1. **直接图片生成**：
-   - 使用PIL库直接生成对比图片
-   - 去除了HTML转图片的中间步骤
-   - 提高了生成效率和图片质量
+- **触发时间**：每天 UTC 11:30（北京时间 19:30）
+- **数据缓存**：使用 GitHub Actions Cache 缓存下载的图片数据
+- **输出保留**：30 天
+- **日志保留**：7 天
 
-2. **优化的布局**：
-   - 大标题：60px，加粗
-   - 地区标题：48px，加粗
-   - 图片放大2.5倍，确保清晰度
-   - 自动居中布局，合理利用画布空间
+### 手动触发
 
-3. **灵活的配置**：
-   - `IMAGE_SCALE_FACTOR`：图片缩放因子（默认2.5）
-   - `CANVAS_WIDTH`：画布宽度（默认3200px）
-   - `GAP_BETWEEN_IMAGES`：图片间距（默认20px）
+在 GitHub 仓库的 Actions 页面，选择 "Daily Weather Spider" workflow，点击 "Run workflow" 按钮即可手动触发。
 
-### 主要模块
+### 自动清理
 
-- **DailyWeatherSummary**：主流程控制类
-- **ImageDownloader**：负责下载天气图片
-- **WeatherParser**：解析天气数据
-- **ImageGenerator**：生成对比图片
+每周日自动清理 30 天前的 artifacts，避免存储成本过高。
 
-## 注意事项
+## 依赖项
 
-1. 程序需要稳定的网络连接以下载数据
-2. 生成的图片较大，请确保有足够的磁盘空间
-3. 如果某天的数据还未更新，程序会使用前一天的数据
+```
+requests          # HTTP请求库
+Pillow>=9.0.0     # 图像处理库
+retrying          # 重试机制
+pytz              # 时区处理
+```
 
-## 常见问题
+## 许可证
 
-Q: 程序运行失败怎么办？
-A: 检查网络连接和依赖是否正确安装，查看日志文件了解具体错误。
-
-Q: 可以修改下载的地区吗？
-A: 可以在 `downloader.py` 中修改地区列表和对应的URL。
-
-Q: 如何调整图片大小？
-A: 修改 `image_generator.py` 中的配置参数（IMAGE_SCALE_FACTOR、CANVAS_WIDTH等）。
-
-## 更新日志
-
-- 2025-12-19: 重构图片生成逻辑，使用PIL直接生成图片，提高效率和品质
-- 2025-12-18: 优化图片布局，增大字体，改进显示效果
-- 2025-12-17: 修复日期逻辑和路径问题
-- 2025-12-16: 初始版本，支持基本的图片下载和对比功能
+MIT License
